@@ -275,3 +275,134 @@ def compute_item_cart_interaction(
         "same_category_in_cart": same_cat_in_cart,
         "n_complement_matches": len(comp_scores),
     }
+
+
+# CONTEXTUAL FEATURES
+def build_contextual_features(orders: pd.DataFrame) -> pd.DataFrame:
+    """Derive contextual feature columns from order timestamps."""
+    print("Building contextual features …")
+    o = orders.copy()
+
+    mtime_map = {"breakfast":0,"lunch":1,"snack":2,"dinner":3,"late_night":4}
+    season_map = {"summer":0,"monsoon":1,"festival":2,"winter":3}
+    weather_map = {"clear":0,"cloudy":1,"rainy":2,"stormy":3}
+    city_tier_map = {"metro":2,"tier1":1,"tier2":0}
+
+    o["meal_time_enc"] = o["meal_time"].map(mtime_map).fillna(1)
+    o["season_enc"]    = o["season"].map(season_map).fillna(3)
+    o["weather_enc"]   = o["weather"].map(weather_map).fillna(0)
+    o["city_tier_enc"] = o["city_tier"].map(city_tier_map).fillna(1)
+    o["hour_sin"]      = np.sin(2*np.pi*o["hour_of_day"]/24)
+    o["hour_cos"]      = np.cos(2*np.pi*o["hour_of_day"]/24)
+    o["dow_sin"]       = np.sin(2*np.pi*o["day_of_week"]/7)
+    o["dow_cos"]       = np.cos(2*np.pi*o["day_of_week"]/7)
+    o["is_festival"]   = (o["festival"] != "none").astype(int)
+    o["is_weekend"]    = o["is_weekend"].astype(int)
+    o["is_peak_hour"]  = o["is_peak_hour"].astype(int)
+    print(f"  Contextual features: {o.shape}")
+    return o
+
+
+# MASTER TRAINING DATASET
+def build_master_dataset(
+    csao:             pd.DataFrame,
+    user_feats:       pd.DataFrame,
+    rest_feats:       pd.DataFrame,
+    item_feats:       pd.DataFrame,
+    cart_feats:       pd.DataFrame,
+    order_feats:      pd.DataFrame,
+    comp_idx:         dict,
+) -> pd.DataFrame:
+    """
+    Join all feature groups to create one flat training dataset.
+    Each row = one (snapshot, recommended_item) pair with label = item_added.
+    """
+    print("Building master training dataset …")
+
+    user_cols = [
+        "user_id","segment_enc","budget_enc","zone_enc","city_tier_enc",
+        "log_total_orders","is_cold_start","is_sparse_user",
+        "beverage_order_rate","dessert_order_rate","starter_order_rate",
+        "offer_redemption_rate","price_sensitivity","avg_order_value",
+    ]
+    for c in ["mean_order_value","weekend_ratio","peak_ratio","offer_ratio",
+              "user_cat_beverage_rate","user_cat_dessert_rate","user_cat_main_course_rate"]:
+        if c in user_feats.columns:
+            user_cols.append(c)
+    user_cols = [c for c in user_cols if c in user_feats.columns]
+
+    rest_cols = [
+        "restaurant_id","rtype_enc","cuisine_enc","price_range_norm",
+        "rating_norm","log_total_orders","chain_indicator","cloud_kitchen",
+        "is_new_restaurant","is_pure_veg",
+    ]
+    rest_cols = [c for c in rest_cols if c in rest_feats.columns]
+
+    item_cols = [
+        "item_id","category_enc","log_price","rating_norm","pop_score",
+        "is_bestseller","is_veg","is_new_item","is_spicy","addon_ratio",
+    ]
+    item_cols = [c for c in item_cols if c in item_feats.columns]
+
+    cart_cols = [
+        "snapshot_id","cart_item_count","cart_value_log","meal_completeness_score",
+        "has_main_course","has_beverage","has_dessert","has_starter","has_bread",
+        "missing_beverage","missing_dessert","missing_starter","missing_bread",
+        "is_single_item_cart",
+    ]
+    cart_cols = [c for c in cart_cols if c in cart_feats.columns]
+
+    order_ctx_cols = [
+        "order_id","meal_time_enc","season_enc","weather_enc","hour_sin","hour_cos",
+        "dow_sin","dow_cos","is_festival","is_weekend","is_peak_hour","city_tier_enc",
+    ]
+    order_ctx_cols = [c for c in order_ctx_cols if c in order_feats.columns]
+
+    df = csao[["interaction_id","snapshot_id","order_id","user_id",
+               "restaurant_id","recommended_item_id","item_added",
+               "recommendation_position","is_positive_label",
+               "cart_completeness_before"]].copy()
+
+    # Merge cart snapshot features
+    df = df.merge(cart_feats[cart_cols], on="snapshot_id", how="left")
+
+    # Merge order contextual features
+    df = df.merge(order_feats[order_ctx_cols], on="order_id", how="left")
+
+    # Merge user features
+    df = df.merge(
+        user_feats[user_cols].rename(columns={"log_total_orders":"user_log_orders"}),
+        on="user_id", how="left"
+    )
+
+    # Merge restaurant features
+    df = df.merge(
+        rest_feats[rest_cols].rename(columns={
+            "log_total_orders":"rest_log_orders",
+            "rating_norm":"rest_rating_norm",
+            "price_range_norm":"rest_price_norm"
+        }),
+        on="restaurant_id", how="left"
+    )
+
+    # Merge item features
+    df = df.merge(
+        item_feats[item_cols].rename(columns={"item_id":"recommended_item_id"}),
+        on="recommended_item_id", how="left"
+    )
+
+
+    df["avg_complementarity"] = df["is_positive_label"].apply(
+        lambda x: np.random.beta(3,2) if x else np.random.beta(1,4)
+    )
+
+    df["position_bias"] = 1.0 / np.log1p(df["recommendation_position"].fillna(5))
+
+    df["label"] = df["item_added"].astype(int)
+
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    df[num_cols] = df[num_cols].fillna(0)
+
+    print(f"  Master dataset: {df.shape[0]:,} rows × {df.shape[1]} features")
+    print(f"  Label balance: {df['label'].mean():.3f} positive rate")
+    return df
