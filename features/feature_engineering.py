@@ -169,3 +169,48 @@ def build_item_features(items: pd.DataFrame, order_items: pd.DataFrame) -> pd.Da
     it[num_cols] = it[num_cols].fillna(0)
     print(f"  Item feature matrix: {it.shape}")
     return it
+
+
+# CART CONTEXT FEATURES  
+def compute_cart_features(cart_snapshot_row: pd.Series) -> dict:
+    """
+    Given a single cart_snapshot row, compute all cart-level features.
+    Called at inference time for real-time recommendations.
+    """
+    return {
+        "cart_item_count":       cart_snapshot_row.get("cart_item_count", 0),
+        "cart_total_value":      cart_snapshot_row.get("cart_total_value", 0.0),
+        "has_main_course":       int(cart_snapshot_row.get("has_main_course", False)),
+        "has_beverage":          int(cart_snapshot_row.get("has_beverage", False)),
+        "has_dessert":           int(cart_snapshot_row.get("has_dessert", False)),
+        "has_starter":           int(cart_snapshot_row.get("has_starter", False)),
+        "has_bread":             int(cart_snapshot_row.get("has_bread", False)),
+        "meal_completeness":     float(cart_snapshot_row.get("meal_completeness_score", 0.0)),
+        "is_single_item_cart":   int(cart_snapshot_row.get("cart_item_count", 0) == 1),
+        "cart_value_log":        np.log1p(cart_snapshot_row.get("cart_total_value", 0.0)),
+        "missing_beverage":      int(not cart_snapshot_row.get("has_beverage", False)),
+        "missing_dessert":       int(not cart_snapshot_row.get("has_dessert", False)),
+        "missing_starter":       int(not cart_snapshot_row.get("has_starter", False)),
+        "missing_bread":         int(not cart_snapshot_row.get("has_bread", False)),
+    }
+
+
+def build_cart_features_from_snapshots(cart_snaps: pd.DataFrame) -> pd.DataFrame:
+    """Build cart features for all snapshots (for training)."""
+    print("Building cart snapshot features …")
+    cs = cart_snaps.copy()
+    cs["is_single_item_cart"] = (cs["cart_item_count"] == 1).astype(int)
+    cs["cart_value_log"]      = np.log1p(cs["cart_total_value"])
+    cs["missing_beverage"]    = (~cs["has_beverage"]).astype(int)
+    cs["missing_dessert"]     = (~cs["has_dessert"]).astype(int)
+    cs["missing_starter"]     = (~cs["has_starter"]).astype(int)
+    cs["missing_bread"]       = (~cs["has_bread"]).astype(int)
+    cs["has_main_course"]     = cs["has_main_course"].astype(int)
+    cs["has_beverage"]        = cs["has_beverage"].astype(int)
+    cs["has_dessert"]         = cs["has_dessert"].astype(int)
+    cs["has_starter"]         = cs["has_starter"].astype(int)
+    cs["has_bread"]           = cs["has_bread"].astype(int)
+    print(f"  Cart snapshot features: {cs.shape}")
+    return cs
+
+
