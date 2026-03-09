@@ -570,3 +570,152 @@ def generate_orders(
         order_counter += 1
 
     return pd.DataFrame(orders), pd.DataFrame(order_items)
+
+
+# CART SNAPSHOTS
+def generate_cart_snapshots(order_items: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each order, create a snapshot BEFORE each item addition.
+    This gives us the sequential cart-building context.
+    """
+    print(f"[6/8] Generating cart snapshots …")
+    snapshots = []
+    snap_counter = 1
+
+    for order_id, grp in tqdm(order_items.groupby("order_id"), desc="  snapshots"):
+        grp = grp.sort_values("sequence_in_cart").reset_index(drop=True)
+        cart_items_so_far = []
+
+        for idx, row in grp.iterrows():
+            # Snapshot BEFORE adding this item
+            cats_in_cart = [ci["item_category"] for ci in cart_items_so_far]
+            cart_value   = sum(ci["item_price"] for ci in cart_items_so_far)
+
+            has_main = any(c=="main_course" for c in cats_in_cart)
+            has_bev  = any(c=="beverage"    for c in cats_in_cart)
+            has_des  = any(c=="dessert"     for c in cats_in_cart)
+            has_sta  = any(c=="starter"     for c in cats_in_cart)
+            has_brd  = any(c=="bread"       for c in cats_in_cart)
+
+            # Meal completeness score (0=nothing, 1=complete)
+            completeness = (
+                0.4 * has_main +
+                0.2 * has_bev  +
+                0.15* has_des  +
+                0.15* has_sta  +
+                0.10* has_brd
+            )
+
+            snapshots.append({
+                "snapshot_id":           f"S{snap_counter:09d}",
+                "order_id":              order_id,
+                "user_id":               row["user_id"],
+                "restaurant_id":         row["restaurant_id"],
+                "cart_item_count":       len(cart_items_so_far),
+                "cart_total_value":      round(cart_value, 2),
+                "has_main_course":       has_main,
+                "has_beverage":          has_bev,
+                "has_dessert":           has_des,
+                "has_starter":           has_sta,
+                "has_bread":             has_brd,
+                "meal_completeness_score": round(completeness, 4),
+                "next_item_added":       row["item_id"],
+                "next_item_category":    row["item_category"],
+                "sequence":              row["sequence_in_cart"],
+            })
+            snap_counter += 1
+
+            # Now add this item to cart
+            cart_items_so_far.append({
+                "item_id":       row["item_id"],
+                "item_category": row["item_category"],
+                "item_price":    row["item_price"],
+            })
+
+    return pd.DataFrame(snapshots)
+
+
+
+# CSAO INTERACTIONS
+def generate_csao_interactions(
+    cart_snapshots: pd.DataFrame,
+    items: pd.DataFrame,
+    users: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Simulate CSAO recommendation impressions and responses.
+    For each cart snapshot, simulate 10 recommendations being shown.
+    Mark accepted (=1) if it is the next_item_added.
+    Also generate some negative samples.
+    """
+    print(f"[7/8] Generating CSAO interactions …")
+    user_seg = users.set_index("user_id")["user_segment"].to_dict()
+    user_bev = users.set_index("user_id")["beverage_order_rate"].to_dict()
+    user_des = users.set_index("user_id")["dessert_order_rate"].to_dict()
+
+    items_by_rest = items.groupby("restaurant_id")["item_id"].apply(list).to_dict()
+
+    interactions = []
+    inter_counter = 1
+
+    # Only simulate CSAO for snapshots where cart is NOT empty (seq >= 1)
+    eligible = cart_snapshots[cart_snapshots["cart_item_count"] >= 1].reset_index(drop=True)
+
+    n_sample = min(len(eligible), int(N_SESSIONS * 1.3))
+    eligible = eligible.sample(min(n_sample, len(eligible)), random_state=42)
+
+    for _, snap in tqdm(eligible.iterrows(), total=len(eligible), desc="  csao"):
+        uid  = snap["user_id"]
+        rid  = snap["restaurant_id"]
+        seg  = user_seg.get(uid, "occasional")
+        next_item = snap["next_item_added"]
+
+        rest_items = items_by_rest.get(rid, [])
+        if len(rest_items) < 2:
+            continue
+
+        n_shown = random.randint(8, 10)
+        shown = [next_item]
+        negatives = [i for i in rest_items if i != next_item]
+        shown += random.sample(negatives, min(n_shown-1, len(negatives)))
+        random.shuffle(shown)
+
+        # Acceptance rate by segment
+        seg_accept_rates = {
+            "new": 0.11, "occasional": 0.15,
+            "regular": 0.20, "frequent": 0.27, "power": 0.32
+        }
+        base_accept = seg_accept_rates.get(seg, 0.20)
+
+        for pos, iid in enumerate(shown, start=1):
+            is_target = (iid == next_item)
+
+            pos_bias = max(0.3, 1.0 - (pos-1)*0.08)
+
+            # Acceptance probability
+            accept_prob = base_accept * pos_bias
+            if is_target:
+                accept_prob = min(0.95, accept_prob * 2.5)  
+
+            clicked = random.random() < (accept_prob * 1.5)
+            added   = clicked and (random.random() < accept_prob)
+
+            time_to_click = max(1, int(np.random.exponential(10))) if clicked else 0
+
+            interactions.append({
+                "interaction_id":        f"C{inter_counter:09d}",
+                "snapshot_id":           snap["snapshot_id"],
+                "order_id":              snap["order_id"],
+                "user_id":               uid,
+                "restaurant_id":         rid,
+                "recommended_item_id":   iid,
+                "recommendation_position": pos,
+                "item_clicked":          clicked,
+                "item_added":            added,
+                "time_to_click_sec":     time_to_click,
+                "is_positive_label":     is_target,
+                "cart_completeness_before": snap["meal_completeness_score"],
+            })
+            inter_counter += 1
+
+    return pd.DataFrame(interactions)
