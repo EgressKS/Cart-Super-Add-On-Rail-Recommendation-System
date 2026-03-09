@@ -406,3 +406,33 @@ def build_master_dataset(
     print(f"  Master dataset: {df.shape[0]:,} rows × {df.shape[1]} features")
     print(f"  Label balance: {df['label'].mean():.3f} positive rate")
     return df
+
+
+# TEMPORAL TRAIN/VAL/TEST SPLIT
+def temporal_split(master: pd.DataFrame, orders: pd.DataFrame) -> tuple:
+    """
+    Split using order_date for temporal integrity (no leakage).
+    Train: first 80% of time  |  Val: next 10%  |  Test: last 10%
+    """
+    print("Applying temporal train/val/test split …")
+
+    order_dates = orders[["order_id","order_date"]].copy()
+    order_dates["order_date"] = pd.to_datetime(order_dates["order_date"])
+    master = master.merge(order_dates, on="order_id", how="left")
+
+    all_dates = order_dates["order_date"].dropna()
+    d_min, d_max = all_dates.min(), all_dates.max()
+    span = (d_max - d_min).days
+    cutoff_val  = d_min + pd.Timedelta(days=int(span * 0.80))
+    cutoff_test = d_min + pd.Timedelta(days=int(span * 0.90))
+
+    train = master[master["order_date"] <  cutoff_val]
+    val   = master[(master["order_date"] >= cutoff_val) & (master["order_date"] < cutoff_test)]
+    test  = master[master["order_date"] >= cutoff_test]
+
+    print(f"  Train: {len(train):,}  Val: {len(val):,}  Test: {len(test):,}")
+    print(f"  Train date range: {train['order_date'].min().date()} to {train['order_date'].max().date()}")
+    print(f"  Val   date range: {val['order_date'].min().date()} to {val['order_date'].max().date()}")
+    print(f"  Test  date range: {test['order_date'].min().date()} to {test['order_date'].max().date()}")
+    return train, val, test
+
