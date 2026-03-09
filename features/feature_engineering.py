@@ -214,3 +214,64 @@ def build_cart_features_from_snapshots(cart_snaps: pd.DataFrame) -> pd.DataFrame
     return cs
 
 
+# ITEM-CART INTERACTION FEATURES
+def build_complementarity_index(comp: pd.DataFrame) -> dict:
+    """Build fast-lookup dict: item_id → [(complement_id, score), ...]"""
+    print("Building complementarity index …")
+    idx = {}
+    for _, row in comp.iterrows():
+        idx.setdefault(row["item_id_1"], []).append(
+            (row["item_id_2"], row["complementarity_score"])
+        )
+    for k in idx:
+        idx[k] = sorted(idx[k], key=lambda x: -x[1])
+    print(f"  Complementarity index: {len(idx):,} source items")
+    return idx
+
+
+def compute_item_cart_interaction(
+    candidate_item: pd.Series,
+    cart_items: list,      
+    comp_idx: dict,
+    item_features: pd.DataFrame
+) -> dict:
+    """
+    Compute real-time item-cart interaction features for a single candidate.
+    """
+    iid     = candidate_item["item_id"]
+    i_cat   = candidate_item.get("category", "main_course")
+    i_price = candidate_item.get("price", 0.0)
+
+
+    already_in_cart = int(iid in cart_items)
+
+    # Complementarity score is avg complement score between candidate and cart items
+    comp_scores = []
+    for cart_item_id in cart_items:
+        pairs = comp_idx.get(cart_item_id, [])
+        for cid, cscore in pairs:
+            if cid == iid:
+                comp_scores.append(cscore)
+                break
+
+    avg_comp   = float(np.mean(comp_scores)) if comp_scores else 0.0
+    max_comp   = float(np.max(comp_scores))  if comp_scores else 0.0
+
+    if len(cart_items) > 0:
+        cart_prices = item_features[item_features["item_id"].isin(cart_items)]["price"]
+        avg_cart_price = cart_prices.mean() if len(cart_prices) > 0 else i_price
+        price_ratio    = i_price / (avg_cart_price + 1e-6)
+    else:
+        price_ratio = 1.0
+
+    cart_cats = item_features[item_features["item_id"].isin(cart_items)]["category"].tolist()
+    same_cat_in_cart = int(i_cat in cart_cats)
+
+    return {
+        "already_in_cart":      already_in_cart,
+        "avg_complementarity":  avg_comp,
+        "max_complementarity":  max_comp,
+        "price_ratio_to_cart":  min(price_ratio, 5.0),
+        "same_category_in_cart": same_cat_in_cart,
+        "n_complement_matches": len(comp_scores),
+    }
