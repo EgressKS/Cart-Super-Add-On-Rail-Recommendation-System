@@ -213,3 +213,64 @@ def generate_users(n: int) -> pd.DataFrame:
         })
 
     return pd.DataFrame(rows)
+
+
+# RESTAURANTS
+def generate_restaurants(n: int) -> pd.DataFrame:
+    print(f"[2/8] Generating {n:,} restaurants …")
+    price_ranges = [1, 2, 3, 4]   # 1=budget … 4=luxury
+    price_weights = [0.30, 0.50, 0.15, 0.05]
+
+    rows = []
+    for i in range(n):
+        rtype  = weighted_choice(RESTAURANT_TYPES, RESTAURANT_TYPE_WEIGHTS)
+        cuisine= weighted_choice(CUISINES, CUISINE_WEIGHTS)
+        city   = weighted_choice(ALL_CITIES, [0.12,0.12,0.12,0.12,0.08,0.08,0.08,0.08,0.04,0.04,0.04,0.04,0.04,0.04])
+        zone   = weighted_choice(ZONE_TYPES, [0.25,0.40,0.15,0.20])
+        price_rng = weighted_choice(price_ranges, price_weights)
+
+        # Rating distributions
+        rating = clamp(np.random.beta(7,3)*5, 2.5, 5.0)
+
+        # Age: 5% very new → cold start
+        age_days = int(np.random.exponential(400))
+        is_very_new = age_days < 30
+        is_new_rest = age_days < 90
+
+        # Menu size by type
+        menu_sizes = {
+            "chain":100, "independent_premium":50,
+            "local_favorite":60, "cloud_kitchen":35, "street_food":40
+        }
+        menu_size = int(np.random.normal(menu_sizes[rtype], menu_sizes[rtype]*0.2))
+        menu_size = max(10, menu_size)
+
+        avg_prep = max(10, int(np.random.normal(25,8)))
+        avg_del  = max(15, int(np.random.normal(35,10)))
+        aov_restaurant = price_rng * 200 + np.random.normal(0,50)
+
+        rows.append({
+            "restaurant_id":       f"R{i+1:05d}",
+            "restaurant_name":     f"{cuisine.split('/')[0]} {rtype.replace('_',' ').title()} {i+1}",
+            "restaurant_type":     rtype,
+            "cuisine_type":        cuisine,
+            "city":                city,
+            "city_tier":           CITY_TIER[city],
+            "zone_type":           zone,
+            "price_range":         price_rng,
+            "restaurant_rating":   round(rating, 1),
+            "delivery_rating":     round(clamp(rating + np.random.normal(0,0.3), 1.0, 5.0), 1),
+            "is_pure_veg":         (cuisine in ["Desserts","Bakery","South Indian"]) or random.random()<0.15,
+            "chain_indicator":     rtype == "chain",
+            "cloud_kitchen":       rtype == "cloud_kitchen",
+            "menu_size":           menu_size,
+            "has_combos":          random.random() < 0.60,
+            "avg_prep_time_min":   avg_prep,
+            "avg_delivery_time_min": avg_del,
+            "avg_order_value":     round(aov_restaurant, 2),
+            "age_days":            age_days,
+            "is_new_restaurant":   is_new_rest,
+            "is_cold_start":       is_very_new,
+        })
+
+    return pd.DataFrame(rows)
