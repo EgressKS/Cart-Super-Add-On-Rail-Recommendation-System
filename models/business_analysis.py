@@ -159,3 +159,191 @@ def segment_business_impact() -> pd.DataFrame:
         })
 
     return pd.DataFrame(rows)
+
+
+# A/B TESTING FRAMEWORK
+def design_ab_test(
+    baseline_acceptance:  float = 0.13,
+    expected_acceptance:  float = 0.22,
+    alpha:                float = 0.05,
+    power:                float = 0.80,
+    daily_eligible_users: int   = 500_000,
+) -> dict:
+    """
+    Rigorous A/B test design per problem statement requirements.
+    Includes:
+    - Sample size calculation using two-proportion z-test
+    - Guardrail metrics
+    - Statistical testing
+    """
+    # Sample size with two-proportion z-test
+    p1   = baseline_acceptance     
+    p2   = expected_acceptance    
+    mde  = p2 - p1                 
+
+    z_alpha = stats.norm.ppf(1 - alpha/2) 
+    z_beta  = stats.norm.ppf(power)
+
+    p_bar    = (p1 + p2) / 2
+    num      = (z_alpha * np.sqrt(2 * p_bar * (1-p_bar)) + z_beta * np.sqrt(p1*(1-p1) + p2*(1-p2)))**2
+    n_per_group = int(np.ceil(num / (mde**2)))
+
+    # Duration
+    daily_per_group = daily_eligible_users // 2
+    duration_days   = int(np.ceil(n_per_group / daily_per_group))
+
+    primary_metrics = [
+        {
+            "metric":          "CSAO Acceptance Rate",
+            "hypothesis":      "H1: Treatment > Control",
+            "test":            "Two-proportion z-test",
+            "target_lift":     f"+{(p2-p1)*100:.1f} percentage points",
+            "guardrail":       "Must not decrease below control - 2pp",
+        },
+        {
+            "metric":          "Average Order Value (AOV)",
+            "hypothesis":      "H1: Treatment_AOV > Control_AOV",
+            "test":            "Welch t-test",
+            "target_lift":     "+10-15%",
+            "guardrail":       "Must remain positive",
+        },
+        {
+            "metric":          "Cart-to-Order (C2O) Ratio",
+            "hypothesis":      "H1: Treatment does not harm C2O",
+            "test":            "Chi-square test on conversion",
+            "target_lift":     "No degradation (guardrail only)",
+            "guardrail":       "C2O must stay >= baseline - 2pp",
+        },
+    ]
+
+
+    secondary_metrics = [
+        "CSAO Rail Order Share",
+        "CSAO Rail Attach Rate",
+        "Average Items per Order",
+        "Click-Through Rate on CSAO Rail",
+        "Time-to-Order",
+    ]
+
+    # Guardrail metrics 
+    guardrail_metrics = [
+        {
+            "metric":    "Cart Abandonment Rate",
+            "threshold": "Must stay <= baseline + 2pp",
+            "rationale": "CSAO should not disrupt ordering flow",
+        },
+        {
+            "metric":    "User Rating / Satisfaction Score",
+            "threshold": "Must stay >= baseline - 0.1 points",
+            "rationale": "Recommendations must not annoy users",
+        },
+        {
+            "metric":    "App Session Duration (negative)",
+            "threshold": "Session length should not increase > 20%",
+            "rationale": "Excessive decision fatigue indicates bad UX",
+        },
+        {
+            "metric":    "Recommendation Fatigue (CTR degradation over time)",
+            "threshold": "CTR drop < 20% over 7 days",
+            "rationale": "Repeated irrelevant recs cause fatigue",
+        },
+    ]
+
+    return {
+        "experiment_design": {
+            "name":            "CSAO AI vs Baseline A/B Test",
+            "control":         "Rule-based or no CSAO recommendations (50% traffic)",
+            "treatment":       "AI-powered CSAO recommendations (50% traffic)",
+            "traffic_split":   "50/50",
+            "n_per_group":     n_per_group,
+            "duration_days":   max(7, duration_days),  
+            "alpha":           alpha,
+            "power":           power,
+            "mde_pp":          round(mde * 100, 2),
+        },
+        "primary_metrics":   primary_metrics,
+        "secondary_metrics": secondary_metrics,
+        "guardrail_metrics": guardrail_metrics,
+        "statistical_tests": {
+            "acceptance_rate": "Two-proportion z-test (one-tailed)",
+            "aov":             "Welch t-test (one-tailed)",
+            "revenue":         "Bootstrap confidence intervals",
+            "c2o_ratio":       "Chi-square test",
+            "correction":      "Bonferroni correction for multiple testing",
+        },
+        "rollout_strategy": {
+            "phase_1": "1% traffic (canary) — 2 days — check for errors",
+            "phase_2": "10% traffic — 3 days — sanity check metrics",
+            "phase_3": "50/50 A/B — full experiment duration",
+            "phase_4": "If successful: 100% rollout + monitor",
+        },
+        "power_analysis": {
+            "baseline_acceptance": round(p1, 4),
+            "expected_acceptance": round(p2, 4),
+            "min_detectable_effect_pp": round(mde*100, 2),
+            "sample_size_per_group":    n_per_group,
+            "estimated_duration_days":  max(7, duration_days),
+        },
+    }
+
+
+
+# SYSTEM SCALABILITY ANALYSIS
+def scalability_analysis() -> dict:
+    """
+    Demonstrate how the system handles millions of daily requests.
+    Based on peak lunch/dinner demand patterns.
+    """
+    # Traffic patterns 
+    daily_orders      = 3_000_000   # Zomato scale (Assumption)
+    peak_multiplier   = 3.0         # Peak is 3x average
+    avg_rps           = daily_orders / (24 * 3600)
+    peak_rps          = avg_rps * peak_multiplier
+
+    # Each order may trigger multiple CSAO calls
+    avg_cart_additions = 1.8
+    csao_calls_per_order = avg_cart_additions
+    avg_csao_rps  = avg_rps * csao_calls_per_order
+    peak_csao_rps = peak_rps * csao_calls_per_order
+
+    return {
+        "traffic_estimates": {
+            "daily_orders":       daily_orders,
+            "avg_rps":            round(avg_rps, 1),
+            "peak_rps":           round(peak_rps, 1),
+            "csao_avg_rps":       round(avg_csao_rps, 1),
+            "csao_peak_rps":      round(peak_csao_rps, 1),
+        },
+        "latency_budget_ms": {
+            "feature_retrieval":   40,
+            "candidate_generation": 30,
+            "ranking_model":        80,
+            "mmr_reranking":        10,
+            "overhead":             18,
+            "total":               178,
+            "p95_target":          250,
+            "p99_target":          300,
+        },
+        "infrastructure": {
+            "model_serving":    "GBM (ONNX-exported for 3-5x speed), or TF Serving",
+            "feature_store":    "Redis Cluster (sub-5ms lookups, 99.9% availability)",
+            "candidate_index":  "FAISS (approximate nearest neighbor, <10ms)",
+            "api_layer":        "FastAPI on Kubernetes (auto-scaling pods)",
+            "caching":          "Redis cache hit rate ~95% for user/item features",
+            "cdn":              "Feature pre-warming for predicted peak users",
+        },
+        "auto_scaling": {
+            "min_replicas":    5,
+            "max_replicas":    50,
+            "scale_trigger":   "CPU > 70% or latency p95 > 200ms",
+            "scale_up_time":   "< 60 seconds",
+        },
+        "benchmarking_strategy": {
+            "step_1":  "Unit latency test: single request profiling",
+            "step_2":  "Load test with Locust (ramp to 2000 rps)",
+            "step_3":  "Soak test: 24h at 500 rps (detect memory leaks)",
+            "step_4":  "Chaos test: kill 1 pod, verify auto-recovery",
+            "step_5":  "p95/p99 latency must be <250ms/<300ms under 1666 rps peak",
+        },
+    }
+
