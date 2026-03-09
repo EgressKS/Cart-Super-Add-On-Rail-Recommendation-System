@@ -568,3 +568,118 @@ def plot_results(
     plt.close()
     print(f"  Dashboard saved to {path}")
 
+
+
+def main():
+    print("=" * 60)
+    print("MODEL TRAINING & EVALUATION")
+    print("=" * 60)
+
+    # 1. Load data
+    train, val, test = load_splits()
+    X_te, y_te, fc   = get_Xy(test)
+
+    # 2. Baselines
+    print("\nTraining baselines …")
+    pop_res  = train_popularity_baseline(train, test)
+    rule_res = train_rule_based_baseline(train, test)
+    lr_res   = train_logistic_baseline(train, val, test)
+
+    for r in [pop_res, rule_res, lr_res]:
+        print(f"  [{r['model']:25s}] AUC={r['auc_roc']:.4f}  NDCG@10={r['ndcg@10']:.4f}  P@10={r['precision@10']:.4f}")
+
+    # 3. GBM model
+    gbm_res, gbm_model, test_scores, y_te_arr, feat_cols = train_gbm_model(train, val, test)
+    print(f"\n  [GBM Ranking Model]")
+    for k, v in gbm_res.items():
+        if k != "model":
+            print(f"    {k:20s}: {v}")
+
+    # 3b. Two-Tower Neural Network
+    print("\nTraining Two-Tower Neural Network ...")
+    nn_res, nn_scores = train_neural_model(train, val, test)
+    if nn_res:
+        print(f"\n  [Two-Tower Neural Net]")
+        for k, v in nn_res.items():
+            if k != "model":
+                print(f"    {k:20s}: {v}")
+
+    # 4. Segment-wise evaluation
+    best_scores = nn_scores if (nn_res and nn_res["auc_roc"] > gbm_res["auc_roc"]) else test_scores
+    seg_results = segment_wise_evaluation(test, best_scores)
+
+    # 5. Cold-start evaluation
+    print("\nCold-start evaluation …")
+    cs_results = cold_start_evaluation(test, best_scores)
+    for name, r in cs_results.items():
+        print(f"  {name}: AUC={r['auc_roc']:.4f}  NDCG@10={r['ndcg@10']:.4f}")
+
+    # 6. Error analysis
+    err_analysis = error_analysis(test, best_scores)
+    print(f"\nError analysis:")
+    print(f"  TP={err_analysis['true_positives']}  "
+          f"FP={err_analysis['false_positives']}  "
+          f"FN={err_analysis['false_negatives']}")
+
+    # 7. Feature importance
+    fi_df = compute_feature_importance(gbm_model, feat_cols)
+    fi_df.to_csv(os.path.join(REPORT_DIR, "feature_importance.csv"), index=False)
+    print(f"\nTop-10 features:")
+    print(fi_df.head(10).to_string(index=False))
+
+    # 8. Visualizations
+    print("\nGenerating evaluation dashboard …")
+    extra_baselines = [nn_res] if nn_res else []
+    plot_results(
+        baseline_results  = [pop_res, rule_res, lr_res] + extra_baselines,
+        gbm_results       = gbm_res,
+        segment_results   = seg_results,
+        feature_importance= fi_df,
+        error_analysis    = err_analysis,
+    )
+
+    # 9. Improvement summary vs baseline
+    auc_lift_vs_rule = gbm_res["auc_roc"] - rule_res["auc_roc"]
+    ndcg_lift        = gbm_res["ndcg@10"] - rule_res["ndcg@10"]
+    print(f"\nGBM vs Rule-Based:        AUC lift={auc_lift_vs_rule:+.4f}  NDCG@10 lift={ndcg_lift:+.4f}")
+    if nn_res:
+        nn_auc_lift  = nn_res["auc_roc"] - rule_res["auc_roc"]
+        nn_ndcg_lift = nn_res["ndcg@10"] - rule_res["ndcg@10"]
+        print(f"Neural vs Rule-Based:     AUC lift={nn_auc_lift:+.4f}  NDCG@10 lift={nn_ndcg_lift:+.4f}")
+        best_model = "Two-Tower Neural Net" if nn_res["auc_roc"] > gbm_res["auc_roc"] else "GBM Ranking Model"
+        print(f"Best model: {best_model}")
+
+    # 10. Save comprehensive report
+    models_dict = {
+        "popularity_baseline": pop_res,
+        "rule_based_baseline": rule_res,
+        "logistic_regression": lr_res,
+        "gbm_ranking_model":   gbm_res,
+    }
+    if nn_res:
+        models_dict["two_tower_neural"] = nn_res
+
+    report = {
+        "models": models_dict,
+        "segment_wise": seg_results,
+        "cold_start":   cs_results,
+        "error_analysis": err_analysis,
+        "feature_importance_top10": fi_df.head(10).to_dict("records"),
+        "baseline_comparison": {
+            "auc_lift_vs_rule_based":  round(auc_lift_vs_rule, 4),
+            "ndcg_lift_vs_rule_based": round(ndcg_lift, 4),
+            "auc_lift_vs_popularity":  round(gbm_res["auc_roc"] - pop_res["auc_roc"], 4),
+            **({"neural_auc_lift_vs_rule": round(nn_auc_lift, 4)} if nn_res else {}),
+        }
+    }
+
+    with open(os.path.join(REPORT_DIR, "evaluation_report.json"), "w") as f:
+        json.dump(report, f, indent=2, default=str)
+
+    print(f"\nEvaluation report saved to models/reports/evaluation_report.json")
+    print("Training & evaluation complete!")
+    return report
+
+
+if __name__ == "__main__":
+    main()
