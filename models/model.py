@@ -311,3 +311,194 @@ class ItemSemanticEmbedder:
         q = query_emb / (np.linalg.norm(query_emb) + 1e-8)
         c = corpus_embs / (np.linalg.norm(corpus_embs, axis=1, keepdims=True) + 1e-8)
         return (c @ q).astype(np.float32)
+
+
+# RULE-BASED SCORER
+CART_COMPLETION_RULES = {
+    # If category X is in cart, boost category Y
+    "main_course": {"beverage": 0.5, "dessert": 0.4, "side": 0.6, "bread": 0.5},
+    "starter":     {"main_course": 0.8, "beverage": 0.5},
+    "combo":       {"beverage": 0.6, "dessert": 0.4},
+}
+
+VEG_STRICT_CATEGORIES = {"beverage", "dessert", "side"}
+
+
+def rule_based_score(
+    candidate_item:  dict,
+    cart_categories: list,
+    cart_value:      float,
+    meal_completeness: float,
+    user_is_veg:     bool = False,
+) -> float:
+    """
+    Heuristic rule-based score [0..1] for candidate item given current cart.
+    This forms the 5% rule-based component of the ensemble.
+    """
+    score = 0.0
+    cat   = candidate_item.get("category", "main_course")
+
+    # Hard constraint: never recommend non-veg to veg user
+    if user_is_veg and not candidate_item.get("is_veg", True):
+        return -1.0  
+
+    # Meal completion boost
+    missing_beverage = "beverage" not in cart_categories
+    missing_dessert  = "dessert"  not in cart_categories
+    missing_side     = "side"     not in cart_categories
+
+    if cat == "beverage" and missing_beverage:
+        score += 0.6
+    if cat == "dessert"  and missing_dessert:
+        score += 0.4 + (0.2 if meal_completeness > 0.6 else 0.0)
+    if cat == "side"     and missing_side and "main_course" in cart_categories:
+        score += 0.55
+
+    # Cart-completion rules
+    for cart_cat in cart_categories:
+        for boost_cat, boost_val in CART_COMPLETION_RULES.get(cart_cat, {}).items():
+            if cat == boost_cat:
+                score += boost_val * 0.5   
+
+    # Bestseller bonus
+    if candidate_item.get("is_bestseller", False):
+        score += 0.1
+
+    # Don't recommend >50% more than avg cart item price
+    if cart_value > 0 and len(cart_categories) > 0:
+        avg_price  = cart_value / len(cart_categories)
+        item_price = candidate_item.get("price", avg_price)
+        if item_price > avg_price * 2.0:
+            score -= 0.2
+
+    return min(1.0, max(0.0, score))
+
+
+# ENSEMBLE SCORER
+def ensemble_score(
+    neural_score:    float,
+    attention_boost: float,
+    semantic_score:  float,
+    rule_score:      float,
+    weights:         tuple = (0.60, 0.20, 0.15, 0.05),
+) -> float:
+    """
+    Weighted ensemble of all scoring signals.
+    Default weights from problem document architecture.
+    """
+    w_nn, w_attn, w_llm, w_rule = weights
+    final = (
+        w_nn   * neural_score   +
+        w_attn * attention_boost +
+        w_llm  * semantic_score  +
+        w_rule * rule_score
+    )
+    return float(np.clip(final, 0.0, 1.0))
+
+
+# MMR RE-RANKING for diversity
+def mmr_reranking(
+    candidates:  list,   
+    item_embs:   dict,    
+    lambda_param: float = 0.7,
+    top_k:        int   = 10,
+) -> list:
+    """
+    Maximal Marginal Relevance re-ranking.
+    Balances relevance score vs distance from already selected.
+
+    lambda_param: 1.0 = pure relevance, 0.0 = pure diversity
+    """
+    if not candidates:
+        return []
+
+    candidates = sorted(candidates, key=lambda x: -x["score"])
+    selected   = [candidates[0]]
+    remaining  = candidates[1:]
+
+    while len(selected) < top_k and remaining:
+        best_mmr, best_item = -1e9, None
+
+        for c in remaining:
+            relevance = c["score"]
+
+            # Similarity to already selected items
+            if c["item_id"] in item_embs:
+                sims = []
+                for s in selected:
+                    if s["item_id"] in item_embs:
+                        sim = ItemSemanticEmbedder.cosine_sim(
+                            item_embs[c["item_id"]],
+                            item_embs[s["item_id"]],
+                        )
+                        sims.append(sim)
+                max_sim = max(sims) if sims else 0.0
+            else:
+                # Fallback: category-based similarity
+                max_sim = 0.7 if c["category"] == selected[-1].get("category") else 0.2
+
+            mmr = lambda_param * relevance - (1 - lambda_param) * max_sim
+            if mmr > best_mmr:
+                best_mmr, best_item = mmr, c
+
+        if best_item is None:
+            break
+        selected.append(best_item)
+        remaining.remove(best_item)
+
+    return selected
+
+
+# COLD-START HANDLER
+def cold_start_recommendations(
+    restaurant_id:   str,
+    cart_categories: list,
+    meal_time:       str,
+    item_features:   "pd.DataFrame",
+    top_k:           int = 10,
+) -> list:
+    """
+    Pure rule + popularity-based recommendations for new users / new restaurants.
+    Covers cold-start scenario completely.
+    """
+    rest_items = item_features[item_features["restaurant_id"] == restaurant_id].copy()
+    if len(rest_items) == 0:
+        return []
+
+    # Filter by meal-time availability
+    avail_map = {
+        "breakfast": ["all_day","morning_only"],
+        "lunch":     ["all_day","lunch_dinner"],
+        "snack":     ["all_day","evening_only"],
+        "dinner":    ["all_day","lunch_dinner"],
+        "late_night":["all_day"],
+    }
+    allowed = avail_map.get(meal_time, ["all_day"])
+    rest_items = rest_items[rest_items["availability"].isin(allowed + ["all_day"])]
+
+    # Meal-completion priority
+    needs_beverage = "beverage" not in cart_categories
+    needs_dessert  = "dessert"  not in cart_categories
+    needs_side     = "side"     not in cart_categories
+
+    def priority(row):
+        p = row["popularity_score"] + (0.5 if row.get("is_bestseller", False) else 0)
+        if row["category"] == "beverage" and needs_beverage:  p += 0.6
+        if row["category"] == "dessert"  and needs_dessert:   p += 0.4
+        if row["category"] == "side"     and needs_side:      p += 0.5
+        return p
+
+    rest_items["priority"] = rest_items.apply(priority, axis=1)
+    top = rest_items.nlargest(top_k, "priority")
+
+    return [
+        {
+            "item_id":  row["item_id"],
+            "score":    round(row["priority"], 4),
+            "category": row["category"],
+            "name":     row["item_name"],
+            "price":    row["price"],
+            "strategy": "cold_start_popularity",
+        }
+        for _, row in top.iterrows()
+    ]
