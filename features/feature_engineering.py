@@ -96,3 +96,76 @@ def build_user_features(users: pd.DataFrame, orders: pd.DataFrame, order_items: 
 
     print(f"  User feature matrix: {u.shape}")
     return u
+
+
+# RESTAURANT FEATURES
+def build_restaurant_features(restaurants: pd.DataFrame, orders: pd.DataFrame) -> pd.DataFrame:
+    print("Building restaurant features …")
+    r = restaurants.copy()
+
+    rtype_map = {
+        "chain":0,"independent_premium":1,
+        "local_favorite":2,"cloud_kitchen":3,"street_food":4
+    }
+    r["rtype_enc"] = r["restaurant_type"].map(rtype_map).fillna(2)
+
+    le_cuisine = LabelEncoder()
+    r["cuisine_enc"] = le_cuisine.fit_transform(r["cuisine_type"].fillna("Other"))
+
+    if len(orders) > 0:
+        ord_agg = orders.groupby("restaurant_id").agg(
+            total_orders=("order_id","count"),
+            avg_final_value=("final_value","mean"),
+            weekend_order_ratio=("is_weekend","mean"),
+            peak_ratio=("is_peak_hour","mean"),
+        ).reset_index()
+        r = r.merge(ord_agg, on="restaurant_id", how="left")
+        r["total_orders"]      = r["total_orders"].fillna(0)
+        r["avg_final_value"]   = r["avg_final_value"].fillna(r["avg_order_value"])
+        r["weekend_order_ratio"] = r["weekend_order_ratio"].fillna(0.28)
+        r["peak_ratio"]          = r["peak_ratio"].fillna(0.35)
+
+    r["log_total_orders"] = np.log1p(r.get("total_orders", pd.Series(0, index=r.index)))
+    r["price_range_norm"] = r["price_range"] / 4.0
+    r["rating_norm"]      = r["restaurant_rating"] / 5.0
+
+    num_cols = r.select_dtypes(include=[np.number]).columns
+    r[num_cols] = r[num_cols].fillna(0)
+    print(f"  Restaurant feature matrix: {r.shape}")
+    return r
+
+
+# ITEM FEATURES
+def build_item_features(items: pd.DataFrame, order_items: pd.DataFrame) -> pd.DataFrame:
+    print("Building item features …")
+    it = items.copy()
+
+    cat_map = {
+        "main_course":0,"starter":1,"side":2,
+        "bread":3,"beverage":4,"dessert":5,"combo":6
+    }
+    avail_map = {"all_day":0,"morning_only":1,"evening_only":2,"lunch_dinner":3}
+    it["category_enc"]  = it["category"].map(cat_map).fillna(0)
+    it["avail_enc"]     = it["availability"].map(avail_map).fillna(0)
+    it["log_price"]     = np.log1p(it["price"])
+    it["rating_norm"]   = it["item_rating"] / 5.0
+    it["pop_score"]     = it["popularity_score"]
+    it["is_bestseller"] = it["is_bestseller"].astype(int)
+    it["is_veg"]        = it["is_veg"].astype(int)
+    it["is_new_item"]   = it["is_new_item"].astype(int)
+
+    if len(order_items) > 0:
+        oi_agg = order_items.groupby("item_id").agg(
+            order_count=("order_id","count"),
+            order_as_addon_count=("is_add_on","sum"),
+        ).reset_index()
+        oi_agg["addon_ratio"] = oi_agg["order_as_addon_count"] / oi_agg["order_count"].clip(1)
+        it = it.merge(oi_agg, on="item_id", how="left")
+        it["order_count"]    = it["order_count"].fillna(0)
+        it["addon_ratio"]    = it["addon_ratio"].fillna(0)
+        it["log_order_count"]= np.log1p(it["order_count"])
+
+    num_cols = it.select_dtypes(include=[np.number]).columns
+    it[num_cols] = it[num_cols].fillna(0)
+    print(f"  Item feature matrix: {it.shape}")
+    return it
