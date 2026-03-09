@@ -719,3 +719,95 @@ def generate_csao_interactions(
             inter_counter += 1
 
     return pd.DataFrame(interactions)
+
+
+# BASELINE PERFORMANCE
+def generate_baseline_performance() -> pd.DataFrame:
+    print("[8/8] Generating baseline performance metrics …")
+    rows = []
+    segments = ["new","occasional","regular","frequent","power"]
+    meal_times = MEAL_TIMES
+
+    for seg in segments:
+        for mtime in meal_times:
+            base_aov_by_seg = {
+                "new":280,"occasional":330,"regular":380,"frequent":430,"power":520
+            }
+            base_aov = base_aov_by_seg[seg] + np.random.normal(0,20)
+            rows.append({
+                "user_segment":         seg,
+                "meal_time":            mtime,
+                "baseline_aov":         round(base_aov, 2),
+                "baseline_acceptance_rate": round(np.random.uniform(0.08, 0.18), 4),
+                "baseline_ctr":         round(np.random.uniform(0.10, 0.22), 4),
+                "baseline_attach_rate": round(np.random.uniform(0.05, 0.15), 4),
+                "baseline_c2o_ratio":   round(np.random.uniform(0.60, 0.80), 4),
+                "baseline_avg_items":   round(np.random.uniform(1.5, 3.0), 2),
+            })
+    return pd.DataFrame(rows)
+
+
+# MAIN PIPELINE
+def main():
+    print("=" * 60)
+    print("ZOMATO CSAO - SYNTHETIC DATA GENERATION")
+    print(f"Scale: {SCALE:.0%}  |  Users: {N_USERS:,}  |  Restaurants: {N_RESTAURANTS:,}")
+    print("=" * 60)
+
+    # 1. Users
+    users = generate_users(N_USERS)
+    users.to_csv(os.path.join(DATA_DIR, "users.csv"), index=False)
+    print(f"   Saved users.csv  ({len(users):,} rows)")
+
+    # 2. Restaurants
+    restaurants = generate_restaurants(N_RESTAURANTS)
+    restaurants.to_csv(os.path.join(DATA_DIR, "restaurants.csv"), index=False)
+    print(f"   Saved restaurants.csv  ({len(restaurants):,} rows)")
+
+    # 3. Items
+    items = generate_items(N_ITEMS, restaurants)
+    items.to_csv(os.path.join(DATA_DIR, "items.csv"), index=False)
+    print(f"   Saved items.csv  ({len(items):,} rows)")
+
+    # 4. Complementarity
+    comp = generate_complementarity(items)
+    comp.to_csv(os.path.join(DATA_DIR, "item_complementarity.csv"), index=False)
+    print(f"   Saved item_complementarity.csv  ({len(comp):,} rows)")
+
+    # 5. Orders
+    orders, order_items = generate_orders(N_ORDERS, users, restaurants)
+    orders.to_csv(os.path.join(DATA_DIR, "orders.csv"), index=False)
+    order_items.to_csv(os.path.join(DATA_DIR, "order_items.csv"), index=False)
+    print(f"   Saved orders.csv ({len(orders):,}) + order_items.csv ({len(order_items):,})")
+
+    # 6. Cart snapshots
+    snaps = generate_cart_snapshots(order_items)
+    snaps.to_csv(os.path.join(DATA_DIR, "cart_snapshots.csv"), index=False)
+    print(f"   Saved cart_snapshots.csv  ({len(snaps):,} rows)")
+
+    # 7. CSAO interactions
+    csao = generate_csao_interactions(snaps, items, users)
+    csao.to_csv(os.path.join(DATA_DIR, "csao_interactions.csv"), index=False)
+    print(f"   Saved csao_interactions.csv  ({len(csao):,} rows)")
+
+    # 8. Baseline performance
+    baseline = generate_baseline_performance()
+    baseline.to_csv(os.path.join(DATA_DIR, "baseline_performance.csv"), index=False)
+    print(f"   Saved baseline_performance.csv  ({len(baseline):,} rows)")
+
+    print("\n── DATA VALIDATION ──")
+    print(f"  User segments : {users['user_segment'].value_counts().to_dict()}")
+    print(f"  Cold-start users: {users['is_cold_start'].sum():,} ({users['is_cold_start'].mean():.1%})")
+    print(f"  Cuisines covered: {restaurants['cuisine_type'].nunique()}")
+    print(f"  Item categories : {items['category'].value_counts().to_dict()}")
+    print(f"  Veg ratio       : {items['is_veg'].mean():.1%}")
+    print(f"  Single-item orders: {(orders['total_items']==1).mean():.1%}")
+    print(f"  Peak-hour orders  : {orders['is_peak_hour'].mean():.1%}")
+    print(f"  CSAO acceptance   : {csao['item_added'].mean():.1%}")
+
+    print("\n Data generation complete!")
+    return users, restaurants, items, orders, order_items, snaps, csao
+
+
+if __name__ == "__main__":
+    main()
