@@ -480,3 +480,75 @@ def get_cold_start_user_features(city: str = "Mumbai") -> dict:
         "price_sensitivity":0.50,"avg_order_value":350.0,
         "mean_order_value":350.0,"weekend_ratio":0.28,"peak_ratio":0.35,"offer_ratio":0.40,
     }
+
+
+# MAIN
+def main():
+    print("=" * 60)
+    print("FEATURE ENGINEERING PIPELINE")
+    print("=" * 60)
+
+    # 1. Load raw data
+    (users, restaurants, items, orders,
+     order_items, cart_snaps, csao, comp, baseline) = load_raw_data()
+
+    # 2. Build feature tables
+    user_feats  = build_user_features(users, orders, order_items)
+    rest_feats  = build_restaurant_features(restaurants, orders)
+    item_feats  = build_item_features(items, order_items)
+    cart_feats  = build_cart_features_from_snapshots(cart_snaps)
+    order_feats = build_contextual_features(orders)
+    comp_idx    = build_complementarity_index(comp)
+
+    # 3. Save feature tables
+    user_feats.to_csv(os.path.join(PROC_DIR, "user_features.csv"), index=False)
+    rest_feats.to_csv(os.path.join(PROC_DIR, "restaurant_features.csv"), index=False)
+    item_feats.to_csv(os.path.join(PROC_DIR, "item_features.csv"), index=False)
+    print("  Saved feature tables to data/processed/")
+
+    # 4. Build master training dataset
+    master = build_master_dataset(
+        csao, user_feats, rest_feats, item_feats, cart_feats, order_feats, comp_idx
+    )
+
+    # 5. Temporal split
+    train, val, test = temporal_split(master, orders)
+
+    # 6. Save splits
+    feat_cols  = [c for c in FEATURE_COLUMNS if c in master.columns]
+    all_cols   = ID_COLUMNS + feat_cols + [LABEL_COLUMN, "order_date"]
+
+    train_out = train[[c for c in all_cols if c in train.columns]]
+    val_out   = val[[c for c in all_cols if c in val.columns]]
+    test_out  = test[[c for c in all_cols if c in test.columns]]
+
+    train_out.to_csv(os.path.join(TRAIN_DIR, "interactions_train.csv"), index=False)
+    val_out.to_csv(  os.path.join(VAL_DIR,   "interactions_val.csv"),   index=False)
+    test_out.to_csv( os.path.join(TEST_DIR,  "interactions_test.csv"),  index=False)
+
+    print(f"\nFeature columns used: {len(feat_cols)}")
+    print(f"  {feat_cols}")
+
+    # 7. Save metadata
+    import json
+    metadata = {
+        "feature_columns": feat_cols,
+        "label_column":    LABEL_COLUMN,
+        "n_train":         len(train),
+        "n_val":           len(val),
+        "n_test":          len(test),
+        "positive_rate_train": float(train["label"].mean()),
+        "positive_rate_val":   float(val["label"].mean()),
+        "positive_rate_test":  float(test["label"].mean()),
+    }
+    meta_dir = os.path.join(BASE_DIR, "data", "metadata")
+    os.makedirs(meta_dir, exist_ok=True)
+    with open(os.path.join(meta_dir, "feature_metadata.json"), "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print("\nFeature engineering complete!")
+    return train_out, val_out, test_out, feat_cols
+
+
+if __name__ == "__main__":
+    main()
