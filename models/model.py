@@ -233,3 +233,81 @@ class GBMRankingModel:
         with open(path, "rb") as f:
             return pickle.load(f)
 
+
+# ITEM SEMANTIC EMBEDDING (LLM-based)
+class ItemSemanticEmbedder:
+    """
+    Generates semantic embeddings for menu items using Sentence-BERT.
+    Falls back to TF-IDF embeddings if sentence-transformers not installed.
+
+    Usage:
+      embedder = ItemSemanticEmbedder()
+      embeddings = embedder.encode(items_df)  # (N, 384)
+      sim_score  = embedder.cosine_sim(emb_a, emb_b)
+    """
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        self.model_name = model_name
+        self.model = None
+        self._try_load_sentence_transformer()
+
+    def _try_load_sentence_transformer(self):
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer(self.model_name)
+            print(f"  [LLM] Sentence-BERT loaded: {self.model_name}")
+        except Exception:
+            print("  [LLM] sentence-transformers not available; using TF-IDF fallback")
+            self.model = None
+
+    def _make_item_text(self, row) -> str:
+        """Convert item attributes to rich text for LLM encoding."""
+        return (
+            f"{row.get('item_name','')} "
+            f"category:{row.get('category','')} "
+            f"cuisine:{row.get('cuisine_tag','')} "
+            f"{'veg' if row.get('is_veg', False) else 'nonveg'} "
+            f"price:{row.get('price',0):.0f} "
+            f"{'bestseller' if row.get('is_bestseller',False) else ''} "
+            f"{'spicy' if row.get('is_spicy',False) else ''}"
+        )
+
+    def encode(self, items_df, batch_size: int = 256) -> np.ndarray:
+        """
+        Encode all items → embeddings matrix.
+        Returns np.ndarray of shape (N, embedding_dim).
+        """
+        texts = [self._make_item_text(row) for _, row in items_df.iterrows()]
+
+        if self.model is not None:
+            # Sentence-BERT path
+            embeddings = self.model.encode(
+                texts,
+                batch_size=batch_size,
+                show_progress_bar=True,
+                convert_to_numpy=True,
+            )
+        else:
+            # TF-IDF fallback will keep dimensionality manageable
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.decomposition import TruncatedSVD
+            tfidf = TfidfVectorizer(max_features=500, ngram_range=(1,2))
+            X     = tfidf.fit_transform(texts).toarray()
+            svd   = TruncatedSVD(n_components=min(64, X.shape[1]-1), random_state=42)
+            embeddings = svd.fit_transform(X)
+
+        return embeddings.astype(np.float32)
+
+    @staticmethod
+    def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+        na = np.linalg.norm(a)
+        nb = np.linalg.norm(b)
+        if na < 1e-8 or nb < 1e-8:
+            return 0.0
+        return float(np.dot(a, b) / (na * nb))
+
+    @staticmethod
+    def batch_cosine_sim(query_emb: np.ndarray, corpus_embs: np.ndarray) -> np.ndarray:
+        """Compute cosine similarity between one query and N corpus embeddings."""
+        q = query_emb / (np.linalg.norm(query_emb) + 1e-8)
+        c = corpus_embs / (np.linalg.norm(corpus_embs, axis=1, keepdims=True) + 1e-8)
+        return (c @ q).astype(np.float32)
