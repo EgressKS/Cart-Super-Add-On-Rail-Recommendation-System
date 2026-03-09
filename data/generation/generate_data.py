@@ -384,3 +384,189 @@ def generate_items(n: int, restaurants: pd.DataFrame) -> pd.DataFrame:
             break
 
     return pd.DataFrame(rows)
+
+
+# ITEM COMPLEMENTARITY MATRIX
+def generate_complementarity(items: pd.DataFrame) -> pd.DataFrame:
+    print(f"[4/8] Building item complementarity pairs …")
+    pairs = []
+    items_by_rest = items.groupby("restaurant_id")
+
+    for rest_id, grp in tqdm(items_by_rest, desc="  complements"):
+        grp = grp.reset_index(drop=True)
+        cats = grp.groupby("category")
+
+        for i, row_a in grp.iterrows():
+            cat_a = row_a["category"]
+            complement_cats = COMPLEMENT_RULES.get(cat_a, {})
+
+            for cat_b, base_prob in complement_cats.items():
+                if cat_b not in cats.groups:
+                    continue
+                cat_b_items = cats.get_group(cat_b)
+                # Sample up to 3 complements per item
+                for _, row_b in cat_b_items.sample(min(3, len(cat_b_items))).iterrows():
+                    score = base_prob * row_b["popularity_score"] * (0.8 + 0.4*random.random())
+                    pairs.append({
+                        "item_id_1":           row_a["item_id"],
+                        "item_id_2":           row_b["item_id"],
+                        "restaurant_id":       rest_id,
+                        "complementarity_score": round(clamp(score, 0.0, 1.0), 4),
+                        "co_occurrence_score": round(clamp(score * 0.9, 0.0, 1.0), 4),
+                    })
+
+    df = pd.DataFrame(pairs)
+
+    if len(df) > 500_000:
+        df = df.nlargest(500_000, "complementarity_score")
+    return df
+
+
+# ORDERS
+def generate_orders(
+    n: int,
+    users: pd.DataFrame,
+    restaurants: pd.DataFrame
+) -> tuple:
+    """Returns (orders_df, order_items_df)"""
+    print(f"[5/8] Generating {n:,} orders + order items …")
+
+    
+    user_ids = users["user_id"].tolist()
+    user_lookup = users.set_index("user_id")
+
+    rest_ids  = restaurants["restaurant_id"].tolist()
+    rest_lookup = restaurants.set_index("restaurant_id")
+
+    # Temporal hour distribution (peak lunch + dinner)
+    hour_weights = [
+        0.003,0.002,0.001,0.001,0.002,0.005,   # 0-5 AM
+        0.015,0.025,0.030,0.020,0.018,0.040,   # 6-11 AM
+        0.060,0.065,0.055,0.030,0.025,0.025,   # 12-5 PM 
+        0.035,0.065,0.070,0.055,0.030,0.015,   # 6-11 PM 
+    ]
+    hour_weights = [w/sum(hour_weights) for w in hour_weights]
+
+    orders, order_items = [], []
+    order_counter = 1
+    oi_counter    = 1
+
+    
+    items_file = os.path.join(DATA_DIR, "items.csv")
+    if os.path.exists(items_file):
+        items = pd.read_csv(items_file)
+    else:
+        raise FileNotFoundError("Run item generation first.")
+
+    items_by_rest = {rid: grp.reset_index(drop=True)
+                     for rid, grp in items.groupby("restaurant_id")}
+
+    for _ in tqdm(range(n), desc="  orders"):
+        user_id = random.choice(user_ids)
+        rest_id = random.choice(rest_ids)
+
+        if rest_id not in items_by_rest or len(items_by_rest[rest_id]) == 0:
+            continue
+
+        u = user_lookup.loc[user_id]
+        r = rest_lookup.loc[rest_id]
+
+        # Timestamp: weighted by hour + seasonality
+        hour  = int(np.random.choice(range(24), p=hour_weights))
+        day   = random.randint(0, DATE_RANGE_DAYS)
+        ts    = START_DATE + timedelta(days=day, hours=hour,
+                                       minutes=random.randint(0,59))
+        mtime = meal_time_from_hour(hour)
+        dow   = ts.weekday()
+        season= get_season(ts.month)
+        festival = festival_in_date(ts)
+        weather  = weighted_choice(WEATHER_CONDITIONS, WEATHER_WEIGHTS)
+
+        # Filter items available at this restaurant
+        rest_items = items_by_rest[rest_id]
+
+        # Veg filtering
+        if u["veg_preference"]:
+            avail = rest_items[rest_items["is_veg"] == True]
+            if len(avail) == 0:
+                avail = rest_items
+        else:
+            avail = rest_items
+
+        # Cart size: 50% single-item orders
+        cart_probs = [0.50, 0.30, 0.12, 0.06, 0.02]  # 1,2,3,4,5+ items
+        n_items_in_cart = random.choices([1,2,3,4,5], weights=cart_probs)[0]
+        n_items_in_cart = min(n_items_in_cart, len(avail))
+        if n_items_in_cart == 0:
+            continue
+
+        # Prioritise main course first, then complements
+        main_items = avail[avail["category"] == "main_course"]
+        chosen_items = []
+
+        if len(main_items) > 0:
+            chosen_items.append(main_items.sample(1).iloc[0])
+            remaining = avail[~avail["item_id"].isin([ci["item_id"] for ci in chosen_items])]
+            for _ in range(n_items_in_cart - 1):
+                if len(remaining) == 0: break
+                # Weighted by complementarity and popularity
+                weights = remaining["popularity_score"].values + 0.01
+                weights /= weights.sum()
+                pick = remaining.sample(1, weights=weights).iloc[0]
+                chosen_items.append(pick)
+                remaining = remaining[remaining["item_id"] != pick["item_id"]]
+        else:
+            chosen_items = [avail.sample(1).iloc[0] for _ in range(n_items_in_cart)]
+
+        # Order-level
+        total_value = sum(ci["price"] for ci in chosen_items)
+        has_offer   = (random.random() < u["offer_redemption_rate"])
+        discount    = round(total_value * np.random.uniform(0.05,0.30), 2) if has_offer else 0.0
+        final_value = max(50, total_value - discount)
+
+        oid = f"O{order_counter:08d}"
+        orders.append({
+            "order_id":          oid,
+            "user_id":           user_id,
+            "restaurant_id":     rest_id,
+            "order_date":        ts.strftime("%Y-%m-%d"),
+            "order_time":        ts.strftime("%H:%M:%S"),
+            "hour_of_day":       hour,
+            "day_of_week":       dow,
+            "is_weekend":        dow >= 5,
+            "meal_time":         mtime,
+            "is_peak_hour":      is_peak_hour(hour),
+            "city":              r["city"],
+            "city_tier":         r["city_tier"],
+            "zone_type":         r["zone_type"],
+            "order_status":      "completed",
+            "total_items":       len(chosen_items),
+            "total_value":       round(total_value, 2),
+            "final_value":       round(final_value, 2),
+            "has_offer":         has_offer,
+            "discount_amount":   discount,
+            "season":            season,
+            "weather":           weather,
+            "festival":          festival,
+            "is_first_order":    u["total_orders"] <= 1,
+        })
+
+        for seq, ci in enumerate(chosen_items, start=1):
+            qty = 1 if ci["category"] not in ["beverage"] else random.choices([1,2],[0.7,0.3])[0]
+            order_items.append({
+                "order_item_id":    f"OI{oi_counter:09d}",
+                "order_id":         oid,
+                "item_id":          ci["item_id"],
+                "restaurant_id":    rest_id,
+                "user_id":          user_id,
+                "quantity":         qty,
+                "item_price":       round(ci["price"], 2),
+                "item_category":    ci["category"],
+                "sequence_in_cart": seq,
+                "is_add_on":        seq > 1,
+            })
+            oi_counter += 1
+
+        order_counter += 1
+
+    return pd.DataFrame(orders), pd.DataFrame(order_items)
