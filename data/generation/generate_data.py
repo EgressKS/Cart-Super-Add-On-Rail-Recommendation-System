@@ -384,3 +384,40 @@ def generate_items(n: int, restaurants: pd.DataFrame) -> pd.DataFrame:
             break
 
     return pd.DataFrame(rows)
+
+
+# ITEM COMPLEMENTARITY MATRIX
+def generate_complementarity(items: pd.DataFrame) -> pd.DataFrame:
+    print(f"[4/8] Building item complementarity pairs …")
+    pairs = []
+    items_by_rest = items.groupby("restaurant_id")
+
+    for rest_id, grp in tqdm(items_by_rest, desc="  complements"):
+        grp = grp.reset_index(drop=True)
+        cats = grp.groupby("category")
+
+        for i, row_a in grp.iterrows():
+            cat_a = row_a["category"]
+            complement_cats = COMPLEMENT_RULES.get(cat_a, {})
+
+            for cat_b, base_prob in complement_cats.items():
+                if cat_b not in cats.groups:
+                    continue
+                cat_b_items = cats.get_group(cat_b)
+                # Sample up to 3 complements per item
+                for _, row_b in cat_b_items.sample(min(3, len(cat_b_items))).iterrows():
+                    score = base_prob * row_b["popularity_score"] * (0.8 + 0.4*random.random())
+                    pairs.append({
+                        "item_id_1":           row_a["item_id"],
+                        "item_id_2":           row_b["item_id"],
+                        "restaurant_id":       rest_id,
+                        "complementarity_score": round(clamp(score, 0.0, 1.0), 4),
+                        "co_occurrence_score": round(clamp(score * 0.9, 0.0, 1.0), 4),
+                    })
+
+    df = pd.DataFrame(pairs)
+
+    if len(df) > 500_000:
+        df = df.nlargest(500_000, "complementarity_score")
+    return df
+
