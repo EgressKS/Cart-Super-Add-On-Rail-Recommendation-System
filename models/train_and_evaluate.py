@@ -131,3 +131,53 @@ def evaluate_model(y_true, y_scores, model_name="Model", threshold=0.5):
     }
     return results
 
+
+# BASELINE MODELS
+def train_popularity_baseline(train, test):
+    """
+    Always recommend based on item popularity_score only.
+    No ML, no user context.
+    """
+    if "pop_score" in test.columns:
+        y_scores = test["pop_score"].fillna(0).values
+    else:
+        y_scores = np.random.rand(len(test))
+    y_true = test[LABEL_COL].values
+    return evaluate_model(y_true, y_scores, "Popularity Baseline")
+
+
+def train_rule_based_baseline(train, test):
+    """
+    Rule-based scoring using cart completion signals only.
+    Missing_beverage * 0.6 + missing_dessert * 0.4 + bestseller * 0.2
+    """
+    scores = np.zeros(len(test))
+    if "missing_beverage" in test.columns:
+        scores += test["missing_beverage"].fillna(0).values * 0.40
+    if "missing_dessert" in test.columns:
+        scores += test["missing_dessert"].fillna(0).values * 0.25
+    if "missing_starter" in test.columns:
+        scores += test["missing_starter"].fillna(0).values * 0.15
+    if "avg_complementarity" in test.columns:
+        scores += test["avg_complementarity"].fillna(0).values * 0.40
+    if "is_bestseller" in test.columns:
+        scores += test["is_bestseller"].fillna(0).values * 0.10
+    scores = np.clip(scores, 0, 1)
+    y_true = test[LABEL_COL].values
+    return evaluate_model(y_true, scores, "Rule-Based Baseline")
+
+
+def train_logistic_baseline(train, val, test):
+    """Logistic Regression with all features."""
+    X_tr, y_tr, fc = get_Xy(train)
+    X_te, y_te, _  = get_Xy(test)
+
+    scaler = StandardScaler()
+    X_tr = scaler.fit_transform(X_tr)
+    X_te = scaler.transform(X_te)
+
+    lr = LogisticRegression(max_iter=300, C=0.1, random_state=42, n_jobs=-1)
+    lr.fit(X_tr, y_tr)
+    y_scores = lr.predict_proba(X_te)[:, 1]
+
+    return evaluate_model(y_te, y_scores, "Logistic Regression")
