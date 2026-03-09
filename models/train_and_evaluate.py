@@ -378,3 +378,94 @@ def segment_wise_evaluation(test: pd.DataFrame, y_scores: np.ndarray):
 
     return all_results
 
+
+# COLD-START EVALUATION
+def cold_start_evaluation(test: pd.DataFrame, y_scores: np.ndarray):
+    """Evaluate specifically on cold-start scenarios."""
+    test = test.copy()
+    test["pred_score"] = y_scores
+    results = {}
+
+    # New users (is_cold_start = 1)
+    if "is_cold_start" in test.columns:
+        mask = test["is_cold_start"] == 1
+        if mask.sum() > 10:
+            r = evaluate_model(
+                test.loc[mask, LABEL_COL].values,
+                test.loc[mask, "pred_score"].values,
+                "Cold Start Users"
+            )
+            results["cold_start_users"] = r
+            print(f"  Cold-start users: AUC={r['auc_roc']:.4f}  NDCG@10={r['ndcg@10']:.4f}")
+
+    # New restaurants
+    if "is_new_restaurant" in test.columns:
+        mask = test["is_new_restaurant"] == True
+        if mask.sum() > 10:
+            r = evaluate_model(
+                test.loc[mask, LABEL_COL].values,
+                test.loc[mask, "pred_score"].values,
+                "New Restaurants"
+            )
+            results["new_restaurants"] = r
+
+    # New items
+    if "is_new_item" in test.columns:
+        mask = test["is_new_item"] == 1
+        if mask.sum() > 10:
+            r = evaluate_model(
+                test.loc[mask, LABEL_COL].values,
+                test.loc[mask, "pred_score"].values,
+                "New Items"
+            )
+            results["new_items"] = r
+
+    return results
+
+
+# ERROR ANALYSIS
+def error_analysis(test: pd.DataFrame, y_scores: np.ndarray, threshold=0.5):
+    """
+    Analyse false positives and false negatives to understand failure modes.
+    """
+    test = test.copy()
+    test["pred_score"]  = y_scores
+    test["pred_label"]  = (y_scores >= threshold).astype(int)
+    test["true_label"]  = test[LABEL_COL]
+
+    fp = test[(test["pred_label"] == 1) & (test["true_label"] == 0)]
+    fn = test[(test["pred_label"] == 0) & (test["true_label"] == 1)]
+    tp = test[(test["pred_label"] == 1) & (test["true_label"] == 1)]
+
+    analysis = {
+        "total_positives":       int(test["true_label"].sum()),
+        "total_negatives":       int((test["true_label"] == 0).sum()),
+        "true_positives":        len(tp),
+        "false_positives":       len(fp),
+        "false_negatives":       len(fn),
+        "fp_avg_price":          float(fp["log_price"].mean()) if "log_price" in fp.columns else 0.0,
+        "fn_avg_complementarity":float(fn["avg_complementarity"].mean()) if "avg_complementarity" in fn.columns else 0.0,
+    }
+
+    # Top features where FP occurs
+    if "category_enc" in fp.columns:
+        analysis["fp_category_dist"] = fp["category_enc"].value_counts().to_dict()
+    if "meal_time_enc" in fp.columns:
+        analysis["fp_meal_time_dist"] = fp["meal_time_enc"].value_counts().to_dict()
+    if "is_cold_start" in fp.columns:
+        analysis["fp_cold_start_rate"] = float(fp["is_cold_start"].mean())
+
+    # FN analysis missed true complements
+    if "avg_complementarity" in fn.columns:
+        analysis["fn_high_comp_missed"] = int((fn["avg_complementarity"] > 0.5).sum())
+
+    return analysis
+
+
+# FEATURE IMPORTANCE
+def compute_feature_importance(gbm_model, feature_cols: list) -> pd.DataFrame:
+    """Return sorted feature importance from trained GBM."""
+    fi = gbm_model.feature_importance()
+    df = pd.DataFrame(list(fi.items()), columns=["feature","importance"])
+    df = df.sort_values("importance", ascending=False).reset_index(drop=True)
+    return df
