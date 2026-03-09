@@ -469,3 +469,102 @@ def compute_feature_importance(gbm_model, feature_cols: list) -> pd.DataFrame:
     df = pd.DataFrame(list(fi.items()), columns=["feature","importance"])
     df = df.sort_values("importance", ascending=False).reset_index(drop=True)
     return df
+
+
+# VISUALIZATIONS
+def plot_results(
+    baseline_results:  list,
+    gbm_results:       dict,
+    segment_results:   dict,
+    feature_importance: pd.DataFrame,
+    error_analysis:    dict,
+):
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle("Zomato CSAO - Model Evaluation Dashboard", fontsize=14, fontweight="bold")
+
+    # 1. Baseline Comparison 
+    ax = axes[0, 0]
+    all_models = baseline_results + [gbm_results]
+    model_names = [r["model"] for r in all_models]
+    auc_vals    = [r["auc_roc"] for r in all_models]
+    ndcg_vals   = [r["ndcg@10"] for r in all_models]
+
+    x = np.arange(len(model_names))
+    ax.bar(x - 0.2, auc_vals,  0.35, label="AUC-ROC", color="steelblue", alpha=0.8)
+    ax.bar(x + 0.2, ndcg_vals, 0.35, label="NDCG@10", color="coral",     alpha=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(model_names, rotation=20, ha="right", fontsize=8)
+    ax.set_ylim(0, 1.0)
+    ax.axhline(0.85, color="green", linestyle="--", label="AUC Target", alpha=0.7)
+    ax.legend(fontsize=8)
+    ax.set_title("Model Comparison")
+    ax.set_ylabel("Score")
+
+    # 2. Precision-Recall @ K 
+    ax = axes[0, 1]
+    k_vals  = [1, 3, 5, 10]
+    metrics = {
+        "precision@K": [gbm_results.get(f"precision@{k}", gbm_results.get("precision@10",0)) for k in k_vals],
+        "recall@K":    [gbm_results.get(f"recall@{k}",    gbm_results.get("recall@10",0))    for k in k_vals],
+    }
+    for name, vals in metrics.items():
+        ax.plot(k_vals, vals, marker="o", label=name)
+    ax.set_xlabel("K")
+    ax.set_ylabel("Score")
+    ax.set_title("Precision & Recall @ K")
+    ax.legend(fontsize=9)
+    ax.set_xticks(k_vals)
+
+    # 3. Feature Importance
+    ax = axes[0, 2]
+    top15 = feature_importance.head(15)
+    ax.barh(top15["feature"], top15["importance"], color="mediumpurple", alpha=0.8)
+    ax.invert_yaxis()
+    ax.set_title("Top-15 Feature Importance (GBM)")
+    ax.set_xlabel("Importance")
+    ax.tick_params(axis="y", labelsize=7)
+
+    # 4. Segment-wise AUC 
+    ax = axes[1, 0]
+    if "user_segment" in segment_results:
+        seg_data = segment_results["user_segment"]
+        seg_labels = list(seg_data.keys())
+        seg_aucs   = [seg_data[s]["auc_roc"] for s in seg_labels]
+        colors = ["#ff9999" if v < 0.75 else "#99dd99" for v in seg_aucs]
+        ax.bar(seg_labels, seg_aucs, color=colors)
+        ax.axhline(0.75, color="red", linestyle="--", label="Min AUC", alpha=0.7)
+        ax.set_title("AUC by User Segment")
+        ax.set_ylabel("AUC-ROC")
+        ax.set_ylim(0.5, 1.0)
+        ax.legend(fontsize=8)
+
+    # 5. Meal-time NDCG
+    ax = axes[1, 1]
+    mtime_names = {0:"Breakfast",1:"Lunch",2:"Snack",3:"Dinner",4:"Late Night"}
+    if "meal_time" in segment_results:
+        mt_data = segment_results["meal_time"]
+        labels  = [mtime_names.get(int(k), k) for k in mt_data.keys()]
+        ndcgs   = [mt_data[k]["ndcg@10"] for k in mt_data.keys()]
+        ax.bar(labels, ndcgs, color="teal", alpha=0.8)
+        ax.set_title("NDCG@10 by Meal Time")
+        ax.set_ylabel("NDCG@10")
+        ax.set_ylim(0, 1.0)
+
+    # 6. Error Analysis
+    ax = axes[1, 2]
+    labels = ["True Positives","False Positives","False Negatives"]
+    values = [
+        error_analysis.get("true_positives",0),
+        error_analysis.get("false_positives",0),
+        error_analysis.get("false_negatives",0),
+    ]
+    colors_err = ["#66bb6a","#ef5350","#ffa726"]
+    ax.pie(values, labels=labels, colors=colors_err, autopct="%1.1f%%", startangle=90)
+    ax.set_title("Prediction Breakdown")
+
+    plt.tight_layout()
+    path = os.path.join(REPORT_DIR, "evaluation_dashboard.png")
+    plt.savefig(path, dpi=120, bbox_inches="tight")
+    plt.close()
+    print(f"  Dashboard saved to {path}")
+
