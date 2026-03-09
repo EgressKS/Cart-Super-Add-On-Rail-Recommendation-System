@@ -175,3 +175,61 @@ if TORCH_AVAILABLE:
             )
             attn_out = self.norm(attn_out + cart_embeddings) 
             return attn_out.mean(dim=1)
+        
+
+# SKLEARN GRADIENT BOOSTING
+class GBMRankingModel:
+    """
+    Gradient Boosting model for CSAO ranking.
+    Faster to train than neural networks; used as:
+     - Strong baseline for comparison
+     - Fallback when PyTorch not available
+    """
+    def __init__(
+        self,
+        n_estimators:  int   = 300,
+        max_depth:     int   = 6,
+        learning_rate: float = 0.05,
+        subsample:     float = 0.8,
+        random_state:  int   = 42,
+    ):
+        self.model = GradientBoostingClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            subsample=subsample,
+            min_samples_leaf=20,
+            random_state=random_state,
+            verbose=0,
+        )
+        self.scaler = StandardScaler()
+        self.feature_cols = None
+        self.is_fitted = False
+
+    def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list = None):
+        self.feature_cols = feature_names
+        X_scaled = self.scaler.fit_transform(X)
+        self.model.fit(X_scaled, y)
+        self.is_fitted = True
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        X_scaled = self.scaler.transform(X)
+        return self.model.predict_proba(X_scaled)[:, 1]
+
+    def feature_importance(self) -> dict:
+        if not self.is_fitted or self.feature_cols is None:
+            return {}
+        return dict(zip(self.feature_cols,
+                        self.model.feature_importances_))
+
+    def save(self, path: str):
+        import pickle
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path: str):
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
