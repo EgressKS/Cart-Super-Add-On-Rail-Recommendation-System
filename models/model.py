@@ -311,3 +311,64 @@ class ItemSemanticEmbedder:
         q = query_emb / (np.linalg.norm(query_emb) + 1e-8)
         c = corpus_embs / (np.linalg.norm(corpus_embs, axis=1, keepdims=True) + 1e-8)
         return (c @ q).astype(np.float32)
+
+
+# RULE-BASED SCORER
+CART_COMPLETION_RULES = {
+    # If category X is in cart, boost category Y
+    "main_course": {"beverage": 0.5, "dessert": 0.4, "side": 0.6, "bread": 0.5},
+    "starter":     {"main_course": 0.8, "beverage": 0.5},
+    "combo":       {"beverage": 0.6, "dessert": 0.4},
+}
+
+VEG_STRICT_CATEGORIES = {"beverage", "dessert", "side"}
+
+
+def rule_based_score(
+    candidate_item:  dict,
+    cart_categories: list,
+    cart_value:      float,
+    meal_completeness: float,
+    user_is_veg:     bool = False,
+) -> float:
+    """
+    Heuristic rule-based score [0..1] for candidate item given current cart.
+    This forms the 5% rule-based component of the ensemble.
+    """
+    score = 0.0
+    cat   = candidate_item.get("category", "main_course")
+
+    # Hard constraint: never recommend non-veg to veg user
+    if user_is_veg and not candidate_item.get("is_veg", True):
+        return -1.0  
+
+    # Meal completion boost
+    missing_beverage = "beverage" not in cart_categories
+    missing_dessert  = "dessert"  not in cart_categories
+    missing_side     = "side"     not in cart_categories
+
+    if cat == "beverage" and missing_beverage:
+        score += 0.6
+    if cat == "dessert"  and missing_dessert:
+        score += 0.4 + (0.2 if meal_completeness > 0.6 else 0.0)
+    if cat == "side"     and missing_side and "main_course" in cart_categories:
+        score += 0.55
+
+    # Cart-completion rules
+    for cart_cat in cart_categories:
+        for boost_cat, boost_val in CART_COMPLETION_RULES.get(cart_cat, {}).items():
+            if cat == boost_cat:
+                score += boost_val * 0.5   
+
+    # Bestseller bonus
+    if candidate_item.get("is_bestseller", False):
+        score += 0.1
+
+    # Don't recommend >50% more than avg cart item price
+    if cart_value > 0 and len(cart_categories) > 0:
+        avg_price  = cart_value / len(cart_categories)
+        item_price = candidate_item.get("price", avg_price)
+        if item_price > avg_price * 2.0:
+            score -= 0.2
+
+    return min(1.0, max(0.0, score))
