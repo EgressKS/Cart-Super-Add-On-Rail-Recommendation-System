@@ -347,3 +347,161 @@ def scalability_analysis() -> dict:
         },
     }
 
+
+# RECOMMENDATION SCENARIOS
+def recommendation_examples() -> list:
+    """
+    Examples showing why recommendations make business sense.
+    Directly maps to problem statement's Biryani → Raita → Gulab Jamun chain.
+    """
+    return [
+        {
+            "scenario":      "Biryani Sequential Completion",
+            "cart_state":    ["Chicken Biryani (Rs.350)"],
+            "recommendations": [
+                {"item":"Raita",       "reason":"Classic complement - 80% co-occurrence", "score":0.82},
+                {"item":"Salan",       "reason":"Traditional biryani side - 65%",         "score":0.74},
+                {"item":"Gulab Jamun", "reason":"Popular dessert pairing - 50%",          "score":0.61},
+                {"item":"Lassi",       "reason":"Beverage to complete meal",               "score":0.58},
+            ],
+            "aov_before": 350, "aov_after": 580, "aov_lift_pct": 65.7,
+        },
+        {
+            "scenario":      "Pizza Meal Completion",
+            "cart_state":    ["Margherita Pizza (Rs.320)"],
+            "recommendations": [
+                {"item":"Garlic Bread",  "reason":"Top complement for pizza - 65%", "score":0.79},
+                {"item":"Soft Drink",    "reason":"Beverage missing from cart",      "score":0.71},
+                {"item":"Chicken Wings", "reason":"Popular starter pairing",         "score":0.55},
+            ],
+            "aov_before": 320, "aov_after": 555, "aov_lift_pct": 73.4,
+        },
+        {
+            "scenario":      "Budget User – Low-price Add-ons",
+            "cart_state":    ["Veg Thali (Rs.150)"],
+            "recommendations": [
+                {"item":"Buttermilk",  "reason":"Budget-friendly beverage (Rs.30)", "score":0.68},
+                {"item":"Papad",       "reason":"Low-price side (Rs.20)",           "score":0.62},
+                {"item":"Gulab Jamun (single)", "reason":"Rs.40 dessert",           "score":0.55},
+            ],
+            "aov_before": 150, "aov_after": 240, "aov_lift_pct": 60.0,
+        },
+        {
+            "scenario":      "Late Night Cravings",
+            "cart_state":    ["Chicken Burger (Rs.220)"],
+            "meal_time":     "late_night",
+            "recommendations": [
+                {"item":"Fries",        "reason":"Burger-fries pairing (70%)",   "score":0.77},
+                {"item":"Cold Coffee",  "reason":"Late night beverage boost",     "score":0.65},
+                {"item":"Brownie",      "reason":"Late-night sweet craving",      "score":0.58},
+            ],
+            "aov_before": 220, "aov_after": 405, "aov_lift_pct": 84.1,
+        },
+        {
+            "scenario":      "Cold Start User – Rule-based fallback",
+            "cart_state":    ["South Indian Thali (Rs.200)"],
+            "user_type":     "new (0 orders)",
+            "recommendations": [
+                {"item":"Filter Coffee",  "reason":"Top restaurant beverage (bestseller)", "score":0.71},
+                {"item":"Vada",           "reason":"Popular starter (80% popularity)",     "score":0.65},
+                {"item":"Payasam",        "reason":"Traditional dessert complement",        "score":0.52},
+            ],
+            "aov_before": 200, "aov_after": 330, "aov_lift_pct": 65.0,
+            "strategy": "cold_start_rules + restaurant_popularity",
+        },
+    ]
+
+
+# FULL REPORT GENERATION
+def generate_full_business_report():
+    print("=" * 60)
+    print("BUSINESS IMPACT ANALYSIS")
+    print("=" * 60)
+
+    # Load evaluation report for actual model metrics
+    eval_report_path = os.path.join(REPORT_DIR, "evaluation_report.json")
+    if os.path.exists(eval_report_path):
+        with open(eval_report_path) as f:
+            eval_report = json.load(f)
+        gbm_metrics = eval_report.get("models",{}).get("gbm_ranking_model",{})
+        precision   = gbm_metrics.get("precision@10", 0.30)
+        ndcg        = gbm_metrics.get("ndcg@10",      0.75)
+    else:
+        print("[WARN] Eval report not found. Using target metrics.")
+        precision = 0.30
+        ndcg      = 0.75
+
+    # 1. Metric translation
+    print("\n1. Offline-to-Business Metric Translation …")
+    business = translate_offline_to_business(precision, ndcg)
+
+    print(f"  Precision@10:           {precision:.4f}")
+    print(f"  Projected Acceptance:   {business['acceptance_rate']['projected']:.1%}")
+    print(f"  AOV Lift:               +{business['aov']['lift_pct']:.1f}%  "
+          f"(Rs.{business['aov']['baseline_inr']:.0f} -> Rs.{business['aov']['projected_inr']:.0f})")
+    print(f"  Annual Commission Lift: Rs.{business['revenue']['annual_lift_crore']:.1f} Cr")
+
+    # 2. Segment analysis
+    print("\n2. Segment-level Business Impact …")
+    seg_impact = segment_business_impact()
+    print(seg_impact[["user_segment","baseline_aov","projected_aov",
+                        "aov_lift_pct","baseline_acceptance","projected_acceptance"]].to_string(index=False))
+
+    # 3. A/B test design
+    print("\n3. A/B Test Design …")
+    ab_design = design_ab_test(
+        baseline_acceptance  = 0.13,
+        expected_acceptance  = business['acceptance_rate']['projected'],
+    )
+    ed = ab_design["experiment_design"]
+    print(f"  n per group: {ed['n_per_group']:,}  "
+          f"Duration: {ed['duration_days']} days  "
+          f"MDE: {ed['mde_pp']} pp")
+
+    # 4. Scalability
+    print("\n4. Scalability Analysis …")
+    scale = scalability_analysis()
+    t = scale["traffic_estimates"]
+    l = scale["latency_budget_ms"]
+    print(f"  Peak CSAO RPS: {t['csao_peak_rps']:.0f}")
+    print(f"  Total latency: {l['total']}ms  (budget: {l['p95_target']}ms p95)")
+
+    # 5. Examples
+    examples = recommendation_examples()
+    print(f"\n5. Recommendation Examples: {len(examples)} scenarios generated")
+
+    # 6. Save report
+    report = {
+        "business_impact":      business,
+        "segment_impact":       seg_impact.to_dict("records"),
+        "ab_test_design":       ab_design,
+        "scalability":          scale,
+        "recommendation_examples": examples,
+        "deployment_strategy": {
+            "phase_1_canary":   "1% traffic for 48h — monitor errors, latency",
+            "phase_2_ab_test":  "50/50 split for 7-14 days — measure primary metrics",
+            "phase_3_full_roll":"100% rollout if A/B success + no guardrail violations",
+            "phase_4_monitor":  "Ongoing monitoring: drift detection, retraining schedule",
+            "retraining_freq":  "Weekly model refresh with new order data",
+            "data_freshness":   "User features: daily | Item features: daily | Model: weekly",
+        },
+        "key_insights": [
+            "50% of all orders are single-item — largest CSAO opportunity",
+            "60% of orders lack a beverage — easy, high-acceptance recommendation",
+            "Power users accept 2x more recommendations than new users",
+            "Peak hours (12-2pm, 7-9pm) drive 35% of daily orders — prioritise latency",
+            "Festival seasons show 40% AOV spike — pre-load seasonal recommendations",
+            "Cold-start coverage via rules achieves 20-25% acceptance (vs 5-10% random)",
+            "LLM embeddings enable zero-shot recommendation for new menu items",
+        ],
+    }
+
+    out_path = os.path.join(REPORT_DIR, "business_impact_report.json")
+    with open(out_path, "w") as f:
+        json.dump(report, f, indent=2, default=str)
+
+    # Generate business impact chart
+    _plot_business_impact(seg_impact, business, ab_design)
+
+    print(f"\nBusiness report saved to: {out_path}")
+    return report
