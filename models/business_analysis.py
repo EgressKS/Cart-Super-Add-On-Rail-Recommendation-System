@@ -286,3 +286,64 @@ def design_ab_test(
         },
     }
 
+
+
+# SYSTEM SCALABILITY ANALYSIS
+def scalability_analysis() -> dict:
+    """
+    Demonstrate how the system handles millions of daily requests.
+    Based on peak lunch/dinner demand patterns.
+    """
+    # Traffic patterns 
+    daily_orders      = 3_000_000   # Zomato scale (Assumption)
+    peak_multiplier   = 3.0         # Peak is 3x average
+    avg_rps           = daily_orders / (24 * 3600)
+    peak_rps          = avg_rps * peak_multiplier
+
+    # Each order may trigger multiple CSAO calls
+    avg_cart_additions = 1.8
+    csao_calls_per_order = avg_cart_additions
+    avg_csao_rps  = avg_rps * csao_calls_per_order
+    peak_csao_rps = peak_rps * csao_calls_per_order
+
+    return {
+        "traffic_estimates": {
+            "daily_orders":       daily_orders,
+            "avg_rps":            round(avg_rps, 1),
+            "peak_rps":           round(peak_rps, 1),
+            "csao_avg_rps":       round(avg_csao_rps, 1),
+            "csao_peak_rps":      round(peak_csao_rps, 1),
+        },
+        "latency_budget_ms": {
+            "feature_retrieval":   40,
+            "candidate_generation": 30,
+            "ranking_model":        80,
+            "mmr_reranking":        10,
+            "overhead":             18,
+            "total":               178,
+            "p95_target":          250,
+            "p99_target":          300,
+        },
+        "infrastructure": {
+            "model_serving":    "GBM (ONNX-exported for 3-5x speed), or TF Serving",
+            "feature_store":    "Redis Cluster (sub-5ms lookups, 99.9% availability)",
+            "candidate_index":  "FAISS (approximate nearest neighbor, <10ms)",
+            "api_layer":        "FastAPI on Kubernetes (auto-scaling pods)",
+            "caching":          "Redis cache hit rate ~95% for user/item features",
+            "cdn":              "Feature pre-warming for predicted peak users",
+        },
+        "auto_scaling": {
+            "min_replicas":    5,
+            "max_replicas":    50,
+            "scale_trigger":   "CPU > 70% or latency p95 > 200ms",
+            "scale_up_time":   "< 60 seconds",
+        },
+        "benchmarking_strategy": {
+            "step_1":  "Unit latency test: single request profiling",
+            "step_2":  "Load test with Locust (ramp to 2000 rps)",
+            "step_3":  "Soak test: 24h at 500 rps (detect memory leaks)",
+            "step_4":  "Chaos test: kill 1 pod, verify auto-recovery",
+            "step_5":  "p95/p99 latency must be <250ms/<300ms under 1666 rps peak",
+        },
+    }
+
