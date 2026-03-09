@@ -337,3 +337,44 @@ def train_neural_model(train, val, test):
     print(f"  Saved to models/saved/neural_model.pt")
 
     return results_nn, test_scores_nn
+
+
+# SEGMENT-WISE EVALUATION
+def segment_wise_evaluation(test: pd.DataFrame, y_scores: np.ndarray):
+    """
+    Evaluate model on important sub-groups to check fairness and coverage.
+    """
+    print("\nSegment-wise evaluation …")
+    test = test.copy()
+    test["pred_score"] = y_scores
+    y_true = test[LABEL_COL].values
+
+    segments_config = {
+        "user_segment":   ["segment_enc"],
+        "meal_time":      ["meal_time_enc"],
+        "restaurant_type":["rtype_enc"],
+        "city_tier":      ["city_tier_enc"],
+        "cold_start_user":["is_cold_start"],
+        "budget_tier":    ["budget_enc"],
+    }
+
+    all_results = {}
+    for seg_name, cols in segments_config.items():
+        col = cols[0]
+        if col not in test.columns:
+            continue
+        results_for_seg = {}
+        for val in test[col].unique():
+            mask = test[col] == val
+            if mask.sum() < 10:
+                continue
+            seg_y_true   = test.loc[mask, LABEL_COL].values
+            seg_y_scores = test.loc[mask, "pred_score"].values
+            if seg_y_true.sum() == 0:
+                continue
+            r = evaluate_model(seg_y_true, seg_y_scores, f"{seg_name}={val}")
+            results_for_seg[str(val)] = r
+        all_results[seg_name] = results_for_seg
+
+    return all_results
+
