@@ -436,3 +436,47 @@ def temporal_split(master: pd.DataFrame, orders: pd.DataFrame) -> tuple:
     print(f"  Test  date range: {test['order_date'].min().date()} to {test['order_date'].max().date()}")
     return train, val, test
 
+
+# FEATURE COLUMNS DEFINITION
+FEATURE_COLUMNS = [
+    # User features
+    "segment_enc","budget_enc","zone_enc","city_tier_enc",
+    "user_log_orders","is_cold_start","is_sparse_user",
+    "beverage_order_rate","dessert_order_rate","starter_order_rate",
+    "offer_redemption_rate","price_sensitivity","avg_order_value",
+    # Restaurant features
+    "rtype_enc","cuisine_enc","rest_price_norm","rest_rating_norm",
+    "rest_log_orders","chain_indicator","cloud_kitchen","is_new_restaurant",
+    # Item features
+    "category_enc","log_price","rating_norm","pop_score",
+    "is_bestseller","is_veg","is_new_item","is_spicy","addon_ratio",
+    # Cart context features
+    "cart_item_count","cart_value_log","meal_completeness_score",
+    "has_main_course","has_beverage","has_dessert","has_starter","has_bread",
+    "missing_beverage","missing_dessert","missing_starter","missing_bread",
+    "is_single_item_cart",
+    # Contextual features
+    "meal_time_enc","season_enc","weather_enc","hour_sin","hour_cos",
+    "dow_sin","dow_cos","is_festival","is_weekend","is_peak_hour",
+    # Interaction features
+    "avg_complementarity","position_bias",
+]
+
+LABEL_COLUMN = "label"
+ID_COLUMNS   = ["interaction_id","snapshot_id","order_id","user_id",
+                "restaurant_id","recommended_item_id"]
+
+
+# COLD-START FALLBACK FEATURES
+def get_cold_start_user_features(city: str = "Mumbai") -> dict:
+    """Return average feature values for a brand-new user (0 orders)."""
+    city_tier_map = {"metro":2,"tier1":1,"tier2":0}
+    tier = "metro" if city in ["Mumbai","Delhi","Bangalore","Hyderabad"] else "tier1"
+    return {
+        "segment_enc":0,"budget_enc":1,"zone_enc":1,"city_tier_enc": city_tier_map[tier],
+        "user_log_orders":0.0,"is_cold_start":1,"is_sparse_user":0,
+        "beverage_order_rate":0.35,"dessert_order_rate":0.15,
+        "starter_order_rate":0.20,"offer_redemption_rate":0.40,
+        "price_sensitivity":0.50,"avg_order_value":350.0,
+        "mean_order_value":350.0,"weekend_ratio":0.28,"peak_ratio":0.35,"offer_ratio":0.40,
+    }
