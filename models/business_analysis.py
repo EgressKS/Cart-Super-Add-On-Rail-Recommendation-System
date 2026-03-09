@@ -505,3 +505,85 @@ def generate_full_business_report():
 
     print(f"\nBusiness report saved to: {out_path}")
     return report
+
+
+def _plot_business_impact(seg_impact, business, ab_design):
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("Zomato CSAO - Business Impact Analysis", fontsize=14, fontweight="bold")
+
+    # AOV Lift by Segment
+    ax = axes[0, 0]
+    segs = seg_impact["user_segment"].unique()
+    base_aovs = seg_impact.groupby("user_segment")["baseline_aov"].mean()
+    proj_aovs = seg_impact.groupby("user_segment")["projected_aov"].mean()
+    x = np.arange(len(segs))
+    ax.bar(x-0.2, base_aovs[segs], 0.4, label="Baseline AOV", color="lightblue")
+    ax.bar(x+0.2, proj_aovs[segs], 0.4, label="Projected AOV", color="steelblue")
+    ax.set_xticks(x); ax.set_xticklabels(segs, rotation=15)
+    ax.set_title("AOV: Baseline vs Projected by User Segment")
+    ax.set_ylabel("Avg Order Value (Rs.)")
+    ax.legend(fontsize=9)
+
+    # Acceptance Rate by Segment
+    ax = axes[0, 1]
+    base_acc = seg_impact.groupby("user_segment")["baseline_acceptance"].mean()
+    proj_acc = seg_impact.groupby("user_segment")["projected_acceptance"].mean()
+    ax.bar(x-0.2, base_acc[segs], 0.4, label="Baseline", color="lightcoral")
+    ax.bar(x+0.2, proj_acc[segs], 0.4, label="Projected", color="firebrick")
+    ax.set_xticks(x); ax.set_xticklabels(segs, rotation=15)
+    ax.set_title("Acceptance Rate by User Segment")
+    ax.set_ylabel("Acceptance Rate")
+    ax.legend(fontsize=9)
+
+    # Revenue Impact
+    ax = axes[1, 0]
+    metrics = ["Acceptance Rate\n(pp lift)", "AOV Lift (%)", "CTR Lift (%)"]
+    before  = [business["acceptance_rate"]["baseline"]*100,
+               0,
+               business["ctr"]["baseline"]*100]
+    after   = [business["acceptance_rate"]["projected"]*100,
+               business["aov"]["lift_pct"],
+               business["ctr"]["projected"]*100]
+    x_m = np.arange(len(metrics))
+    ax.bar(x_m-0.2, before, 0.4, label="Baseline", color="lightgreen")
+    ax.bar(x_m+0.2, after,  0.4, label="AI Model",  color="darkgreen")
+    ax.set_xticks(x_m); ax.set_xticklabels(metrics, fontsize=8)
+    ax.set_title("Key Business Metric Comparison")
+    ax.legend(fontsize=9)
+    ax.set_ylabel("Value (%)")
+
+    # A/B Test Power Curve
+    ax = axes[1, 1]
+    sample_sizes = np.linspace(1000, 50000, 100)
+    p1 = ab_design["power_analysis"]["baseline_acceptance"]
+    p2 = ab_design["power_analysis"]["expected_acceptance"]
+    mde = p2 - p1
+
+    def power_for_n(n):
+        p_bar = (p1+p2)/2
+        z_crit= stats.norm.ppf(0.975)
+        se    = np.sqrt(2*p_bar*(1-p_bar)/n)
+        delta = mde / se
+        return 1 - stats.norm.cdf(z_crit - delta)
+
+    powers = [power_for_n(n) for n in sample_sizes]
+    ax.plot(sample_sizes, powers, "purple", linewidth=2)
+    ax.axhline(0.80, color="red", linestyle="--", label="80% power target")
+    n_req = ab_design["power_analysis"]["sample_size_per_group"]
+    ax.axvline(n_req, color="orange", linestyle="--", label=f"n={n_req:,}")
+    ax.set_xlabel("Sample Size per Group")
+    ax.set_ylabel("Statistical Power")
+    ax.set_title("A/B Test Power Analysis")
+    ax.legend(fontsize=9)
+    ax.set_ylim(0, 1.05)
+    ax.grid(alpha=0.3)
+
+    plt.tight_layout()
+    path = os.path.join(REPORT_DIR, "business_impact_charts.png")
+    plt.savefig(path, dpi=120, bbox_inches="tight")
+    plt.close()
+    print(f"  Business charts saved to {path}")
+
+
+if __name__ == "__main__":
+    generate_full_business_report()
