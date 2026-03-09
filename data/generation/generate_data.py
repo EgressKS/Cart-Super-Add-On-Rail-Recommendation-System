@@ -274,3 +274,113 @@ def generate_restaurants(n: int) -> pd.DataFrame:
         })
 
     return pd.DataFrame(rows)
+
+
+# MENU ITEMS
+def generate_items(n: int, restaurants: pd.DataFrame) -> pd.DataFrame:
+    print(f"[3/8] Generating {n:,} menu items …")
+
+    # Item name templates per category
+    ITEM_NAMES = {
+        "main_course": ["Butter Chicken","Chicken Biryani","Paneer Tikka Masala","Dal Makhani",
+                        "Veg Fried Rice","Chicken Noodles","Margherita Pizza","Pasta Arrabiata",
+                        "Chicken Burger","Fish & Chips","Lamb Rogan Josh","Chole Bhature",
+                        "Rajma Rice","Palak Paneer","Chicken Curry","Mutton Biryani"],
+        "starter":     ["Chicken Kebab","Paneer Tikka","Spring Rolls","Chilli Chicken",
+                        "Samosa","Veg Manchurian","Chicken Wings","Onion Bhaji",
+                        "Fish Tikka","Veg Spring Roll","Seekh Kebab","Aloo Tikki"],
+        "side":        ["Raita","Salan","Gulab Jamun Sauce","Coleslaw","Fries",
+                        "Garden Salad","Garlic Dip","Mint Chutney","Tamarind Chutney",
+                        "Mixed Pickle","Boondi Raita","Papad"],
+        "bread":       ["Butter Naan","Garlic Naan","Roti","Paratha","Garlic Bread",
+                        "Pita Bread","Kulcha","Laccha Paratha","Missi Roti"],
+        "beverage":    ["Coke","Pepsi","Lassi","Mango Shake","Cold Coffee",
+                        "Masala Chai","Fresh Lime Soda","Buttermilk","Orange Juice",
+                        "Watermelon Juice","Iced Tea","Mojito","Filter Coffee"],
+        "dessert":     ["Gulab Jamun","Ice Cream","Gajar Halwa","Brownie","Kulfi",
+                        "Kheer","Ras Malai","Jalebi","Cake Slice","Chocolate Mousse",
+                        "Basundi","Peda"],
+        "combo":       ["Combo Meal","Family Pack","Student Combo","Value Meal",
+                        "Party Pack","Meal Deal","Happy Meal"],
+    }
+
+    rest_ids = restaurants["restaurant_id"].tolist()
+    rows = []
+    item_counter = 1
+
+    items_per_restaurant = {}
+    total_menu = restaurants["menu_size"].sum()
+    for _, r in restaurants.iterrows():
+        items_per_restaurant[r["restaurant_id"]] = max(5, int(n * r["menu_size"] / total_menu))
+
+    for rest_id in tqdm(rest_ids, desc="  items"):
+        rest_row = restaurants[restaurants.restaurant_id == rest_id].iloc[0]
+        cuisine  = rest_row["cuisine_type"]
+        price_rng= rest_row["price_range"]
+        n_items_here = items_per_restaurant[rest_id]
+
+        for _ in range(n_items_here):
+            if item_counter > n:
+                break
+            cat = weighted_choice(ITEM_CATEGORIES, CATEGORY_WEIGHTS)
+            names = ITEM_NAMES.get(cat, ["Item"])
+            base_name = random.choice(names)
+
+            # Price by category & restaurant price_range
+            price_ranges_by_cat = {
+                "main_course": (150, 500), "starter": (80, 300),
+                "side":        (30, 150),  "bread":   (20,  80),
+                "beverage":    (20, 150),  "dessert": (60, 300),
+                "combo":       (250, 700),
+            }
+            plo, phi = price_ranges_by_cat[cat]
+            price = clamp(
+                np.random.lognormal(
+                    np.log((plo+phi)/2 * price_rng/2.5), 0.3
+                ), plo, phi * price_rng
+            )
+
+            # Veg preference based on cuisine and restaurant
+            if rest_row["is_pure_veg"]:
+                is_veg = True
+            elif cuisine in ["Biryani/Mughlai","Fast Food"]:
+                is_veg = random.random() < 0.25
+            else:
+                is_veg = random.random() < 0.40
+
+            pop = np.random.beta(2, 8)  
+            is_bestseller = pop > 0.70
+            is_new_item   = random.random() < 0.15
+
+            availability  = random.choices(
+                ["all_day","morning_only","evening_only","lunch_dinner"],
+                weights=[0.70,0.10,0.05,0.15]
+            )[0]
+
+            rows.append({
+                "item_id":            f"I{item_counter:07d}",
+                "restaurant_id":      rest_id,
+                "item_name":          f"{base_name} ({item_counter})",
+                "category":           cat,
+                "price":              round(price, 2),
+                "is_veg":             is_veg,
+                "is_bestseller":      is_bestseller,
+                "is_spicy":           random.random() < 0.35,
+                "is_combo":           cat == "combo",
+                "cuisine_tag":        cuisine,
+                "popularity_score":   round(pop, 4),
+                "item_rating":        round(clamp(np.random.beta(7,3)*5, 2.0, 5.0), 1),
+                "rating_count":       int(np.random.exponential(100)),
+                "calories":           int(np.random.normal(400, 200)),
+                "availability":       availability,
+                "is_new_item":        is_new_item,
+                "days_on_menu":       0 if is_new_item else random.randint(10, 1000),
+                "preparation_time":   max(5, int(np.random.normal(20,8))),
+                "has_customization":  random.random() < 0.30,
+            })
+            item_counter += 1
+
+        if item_counter > n:
+            break
+
+    return pd.DataFrame(rows)
