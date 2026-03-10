@@ -8,11 +8,48 @@
 Build a recommendation system that suggests relevant add-on items
 to customers based on their current cart composition, contextual factors, and
 historical behaviour patterns, while maintaining high acceptance rates and
-customer satisfaction.
+customer satisfaction.Recommendations must update in real-time as items are 
+added (Biryani → suggest Raita → added → suggest Gulab Jamun → added → suggest Lassi).
 
-**Key challenge:** Recommendations must update in real-time as items are added
-(Biryani → suggest Raita → added → suggest Gulab Jamun → added → suggest Lassi),
-all within a strict **200–300 ms** latency budget.
+---
+
+## API Reference
+
+### POST /recommend
+
+```json
+Request:
+{
+  "user_id": "U0000001",
+  "restaurant_id": "R00042",
+  "cart_items": [
+    {"item_id": "I0001234", "quantity": 1}
+  ],
+  "context": {
+    "timestamp": "2025-12-01T13:30:00",
+    "city": "Mumbai",
+    "zone": "business"
+  }
+}
+
+Response:
+{
+  "user_id": "U0000001",
+  "restaurant_id": "R00042",
+  "recommendations": [
+    {"item_id": "I0001567", "item_name": "Raita (567)", "category": "side",
+     "price": 65.0, "score": 0.8234, "strategy": "personalized"},
+    {"item_id": "I0001890", "item_name": "Gulab Jamun (890)", "category": "dessert",
+     "price": 85.0, "score": 0.7612, "strategy": "personalized"},
+    ...
+  ],
+  "latency_ms": 172.3,
+  "strategy_used": "personalized"
+}
+```
+
+### GET /health
+Returns model status and feature store stats.
 
 ---
 
@@ -193,7 +230,7 @@ attention_score = CrossAttention(candidate_item, cart_items)
 
 Captures: "User added Biryani then Raita → Gulab Jamun is now the most likely next add-on"
 
-### LLM Semantic Embeddings (AI Edge)
+### LLM Semantic Embeddings 
 
 ```python
 item_text = f"{item_name} - {category} - {cuisine} - {'veg' if is_veg else 'nonveg'}"
@@ -277,67 +314,7 @@ No future data leaked into training — simulates real deployment.
 
 ---
 
-## 5. System Design 
-
-### Latency Budget (Total: ~178ms)
-
-| Stage | Latency |
-|-------|---------|
-| Feature retrieval (Redis) | ~40ms |
-| Candidate generation | ~30ms |
-| Ranking model (GBM/ONNX) | ~80ms |
-| MMR re-ranking | ~10ms |
-| Overhead | ~18ms |
-| **Total (p50)** | **~178ms** |
-| p95 target | <250ms |
-| p99 target | <300ms |
-
-### Architecture
-
-```
-User Request
-    │
-    ▼
-API Gateway (FastAPI)
-    │
-    ├── Feature Store ←─ Batch updated daily
-    │     ├── User features
-    │     ├── Restaurant features
-    │     └── Item features + embeddings
-    │
-    ├── Candidate Generator
-    │     ├── Complementarity index (FAISS)
-    │     ├── Meal-completion rules
-    │     └── Popularity index
-    │
-    ├── Ranking Model (GBM)
-    │
-    ├── MMR Re-ranker
-    │
-    └── Response (top-10 items)
-
-```
-
-### Scalability
-
-- Daily orders: 3M | Peak RPS: ~188 CSAO calls/sec
-- Auto-scaling: 5–50 Kubernetes pods
-- Redis cache hit rate: ~95% (user/item features updated daily)
-- Model: exported to ONNX for 3–5× faster inference
-
-### Benchmarking Strategy
-
-```
-Step 1: Unit latency  — single request profiling per stage
-Step 2: Load test     — Locust ramp to 2,000 RPS
-Step 3: Soak test     — 24h at 500 RPS (memory leak detection)
-Step 4: Chaos test    — kill 1 pod, verify auto-recovery < 60s
-Step 5: Acceptance    — p95 < 250ms, p99 < 300ms under 1,666 RPS peak
-```
-
----
-
-## 6. Business Impact & A/B Testing (15% weight)
+## 5. Business Impact 
 
 ### Projected Business Metrics
 
@@ -359,31 +336,6 @@ Step 5: Acceptance    — p95 < 250ms, p99 < 300ms under 1,666 RPS peak
 - **Festival orders:** +40% AOV spike — pre-load seasonal recommendations
 - **Late-night:** Comfort food bundles outperform individual suggestions
 
-### A/B Testing Framework
-
-```
-Control   (50%): Rule-based or no CSAO
-Treatment (50%): AI-powered CSAO
-
-Primary metrics:
-  - CSAO Acceptance Rate (two-proportion z-test)
-  - AOV lift (Welch t-test)
-  - C2O Ratio (guardrail — must not degrade)
-
-Guardrail metrics:
-  - Cart abandonment rate <= baseline + 2pp
-  - App rating >= baseline - 0.1
-  - CTR not dropping > 20% over 7 days (fatigue check)
-
-Statistical controls:
-  - Bonferroni correction for multiple testing
-  - Minimum 7-day run (covers full weekly cycle)
-  - Bootstrap CI for revenue projections
-
-Rollout:
-  1% canary (2d) → 10% (3d) → 50/50 A/B (7-14d) → 100%
-```
-
 ---
 
 ## Key Design Decisions & Trade-offs
@@ -396,51 +348,7 @@ Rollout:
 | LLM integration | Sentence-BERT embeddings (offline) | Zero-shot cold start; no latency cost |
 | Re-ranking | MMR (λ=0.7) | Balances relevance vs category diversity |
 | Data split | Temporal (80/10/10) | Prevents leakage; simulates deployment |
-| Latency target | 178ms average | 40% headroom below 300ms budget |
 | Cold start | 4-strategy fallback | Guarantees recommendations for all users |
-
----
-
-## API Reference
-
-### POST /recommend
-
-```json
-Request:
-{
-  "user_id": "U0000001",
-  "restaurant_id": "R00042",
-  "cart_items": [
-    {"item_id": "I0001234", "quantity": 1}
-  ],
-  "context": {
-    "timestamp": "2025-12-01T13:30:00",
-    "city": "Mumbai",
-    "zone": "business"
-  }
-}
-
-Response:
-{
-  "user_id": "U0000001",
-  "restaurant_id": "R00042",
-  "recommendations": [
-    {"item_id": "I0001567", "item_name": "Raita (567)", "category": "side",
-     "price": 65.0, "score": 0.8234, "strategy": "personalized"},
-    {"item_id": "I0001890", "item_name": "Gulab Jamun (890)", "category": "dessert",
-     "price": 85.0, "score": 0.7612, "strategy": "personalized"},
-    ...
-  ],
-  "latency_ms": 172.3,
-  "strategy_used": "personalized"
-}
-```
-
-### GET /health
-Returns model status and feature store stats.
-
-### GET /profile
-Returns per-stage latency breakdown.
 
 ---
 
