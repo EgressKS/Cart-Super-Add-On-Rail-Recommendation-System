@@ -1,0 +1,599 @@
+{
+  "business_impact": {
+    "offline_metrics": {
+      "precision_at_10": 0.5,
+      "ndcg_at_10": 0.5075
+    },
+    "acceptance_rate": {
+      "baseline": 0.13,
+      "projected": 0.375,
+      "lift_pp": 24.5
+    },
+    "aov": {
+      "baseline_inr": 380.0,
+      "projected_inr": 425.0,
+      "lift_abs_inr": 45.0,
+      "lift_pct": 11.84
+    },
+    "ctr": {
+      "baseline": 0.15,
+      "projected": 0.1656
+    },
+    "c2o_ratio": {
+      "baseline": 0.72,
+      "projected": 0.7935
+    },
+    "attach_rate": {
+      "baseline": 0.15,
+      "projected": 0.45
+    },
+    "avg_items_per_order": {
+      "baseline": 2.1,
+      "projected": 2.4
+    },
+    "revenue": {
+      "daily_commission_lift_inr": 27000000.0,
+      "annual_commission_lift_inr": 9855000000.0,
+      "annual_lift_crore": 985.5
+    }
+  },
+  "segment_impact": [
+    {
+      "user_segment": "new",
+      "meal_time": "breakfast",
+      "baseline_aov": 253.71,
+      "projected_aov": 280.79,
+      "aov_lift_pct": 10.67,
+      "baseline_acceptance": 0.1662,
+      "projected_acceptance": 0.2462,
+      "acceptance_lift_pp": 8.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "new",
+      "meal_time": "lunch",
+      "baseline_aov": 293.7,
+      "projected_aov": 312.32,
+      "aov_lift_pct": 6.34,
+      "baseline_acceptance": 0.0893,
+      "projected_acceptance": 0.1693,
+      "acceptance_lift_pp": 8.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "new",
+      "meal_time": "snack",
+      "baseline_aov": 291.02,
+      "projected_aov": 312.63,
+      "aov_lift_pct": 7.43,
+      "baseline_acceptance": 0.1165,
+      "projected_acceptance": 0.1965,
+      "acceptance_lift_pp": 8.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "new",
+      "meal_time": "dinner",
+      "baseline_aov": 293.21,
+      "projected_aov": 315.06,
+      "aov_lift_pct": 7.45,
+      "baseline_acceptance": 0.1186,
+      "projected_acceptance": 0.1986,
+      "acceptance_lift_pp": 8.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "new",
+      "meal_time": "late_night",
+      "baseline_aov": 245.79,
+      "projected_aov": 271.0,
+      "aov_lift_pct": 10.26,
+      "baseline_acceptance": 0.1492,
+      "projected_acceptance": 0.2292,
+      "acceptance_lift_pp": 8.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "occasional",
+      "meal_time": "breakfast",
+      "baseline_aov": 336.07,
+      "projected_aov": 366.4,
+      "aov_lift_pct": 9.02,
+      "baseline_acceptance": 0.1757,
+      "projected_acceptance": 0.2757,
+      "acceptance_lift_pp": 10.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "occasional",
+      "meal_time": "lunch",
+      "baseline_aov": 307.78,
+      "projected_aov": 335.27,
+      "aov_lift_pct": 8.93,
+      "baseline_acceptance": 0.1499,
+      "projected_acceptance": 0.2499,
+      "acceptance_lift_pp": 10.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "occasional",
+      "meal_time": "snack",
+      "baseline_aov": 326.46,
+      "projected_aov": 349.57,
+      "aov_lift_pct": 7.08,
+      "baseline_acceptance": 0.1101,
+      "projected_acceptance": 0.2101,
+      "acceptance_lift_pp": 10.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "occasional",
+      "meal_time": "dinner",
+      "baseline_aov": 331.29,
+      "projected_aov": 352.84,
+      "aov_lift_pct": 6.5,
+      "baseline_acceptance": 0.0959,
+      "projected_acceptance": 0.1959,
+      "acceptance_lift_pp": 10.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "occasional",
+      "meal_time": "late_night",
+      "baseline_aov": 322.06,
+      "projected_aov": 346.24,
+      "aov_lift_pct": 7.51,
+      "baseline_acceptance": 0.1198,
+      "projected_acceptance": 0.2198,
+      "acceptance_lift_pp": 10.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "regular",
+      "meal_time": "breakfast",
+      "baseline_aov": 375.45,
+      "projected_aov": 404.27,
+      "aov_lift_pct": 7.68,
+      "baseline_acceptance": 0.122,
+      "projected_acceptance": 0.262,
+      "acceptance_lift_pp": 14.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "regular",
+      "meal_time": "lunch",
+      "baseline_aov": 377.33,
+      "projected_aov": 410.16,
+      "aov_lift_pct": 8.7,
+      "baseline_acceptance": 0.1585,
+      "projected_acceptance": 0.2985,
+      "acceptance_lift_pp": 14.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "regular",
+      "meal_time": "snack",
+      "baseline_aov": 404.85,
+      "projected_aov": 437.86,
+      "aov_lift_pct": 8.15,
+      "baseline_acceptance": 0.1601,
+      "projected_acceptance": 0.3001,
+      "acceptance_lift_pp": 14.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "regular",
+      "meal_time": "dinner",
+      "baseline_aov": 370.61,
+      "projected_aov": 402.98,
+      "aov_lift_pct": 8.74,
+      "baseline_acceptance": 0.1543,
+      "projected_acceptance": 0.2943,
+      "acceptance_lift_pp": 14.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "regular",
+      "meal_time": "late_night",
+      "baseline_aov": 390.68,
+      "projected_aov": 418.28,
+      "aov_lift_pct": 7.06,
+      "baseline_acceptance": 0.1109,
+      "projected_acceptance": 0.2509,
+      "acceptance_lift_pp": 14.0,
+      "priority_segments": false
+    },
+    {
+      "user_segment": "frequent",
+      "meal_time": "breakfast",
+      "baseline_aov": 405.59,
+      "projected_aov": 440.84,
+      "aov_lift_pct": 8.69,
+      "baseline_acceptance": 0.1405,
+      "projected_acceptance": 0.3205,
+      "acceptance_lift_pp": 18.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "frequent",
+      "meal_time": "lunch",
+      "baseline_aov": 450.35,
+      "projected_aov": 486.87,
+      "aov_lift_pct": 8.11,
+      "baseline_acceptance": 0.152,
+      "projected_acceptance": 0.332,
+      "acceptance_lift_pp": 18.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "frequent",
+      "meal_time": "snack",
+      "baseline_aov": 452.44,
+      "projected_aov": 486.74,
+      "aov_lift_pct": 7.58,
+      "baseline_acceptance": 0.1318,
+      "projected_acceptance": 0.3118,
+      "acceptance_lift_pp": 18.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "frequent",
+      "meal_time": "dinner",
+      "baseline_aov": 410.09,
+      "projected_aov": 439.39,
+      "aov_lift_pct": 7.15,
+      "baseline_acceptance": 0.0864,
+      "projected_acceptance": 0.2664,
+      "acceptance_lift_pp": 18.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "frequent",
+      "meal_time": "late_night",
+      "baseline_aov": 393.08,
+      "projected_aov": 428.79,
+      "aov_lift_pct": 9.08,
+      "baseline_acceptance": 0.1446,
+      "projected_acceptance": 0.3246,
+      "acceptance_lift_pp": 18.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "power",
+      "meal_time": "breakfast",
+      "baseline_aov": 517.27,
+      "projected_aov": 557.18,
+      "aov_lift_pct": 7.72,
+      "baseline_acceptance": 0.1428,
+      "projected_acceptance": 0.3628,
+      "acceptance_lift_pp": 22.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "power",
+      "meal_time": "lunch",
+      "baseline_aov": 502.67,
+      "projected_aov": 539.39,
+      "aov_lift_pct": 7.3,
+      "baseline_acceptance": 0.1138,
+      "projected_acceptance": 0.3338,
+      "acceptance_lift_pp": 22.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "power",
+      "meal_time": "snack",
+      "baseline_aov": 532.28,
+      "projected_aov": 576.25,
+      "aov_lift_pct": 8.26,
+      "baseline_acceptance": 0.1797,
+      "projected_acceptance": 0.3997,
+      "acceptance_lift_pp": 22.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "power",
+      "meal_time": "dinner",
+      "baseline_aov": 499.3,
+      "projected_aov": 542.62,
+      "aov_lift_pct": 8.68,
+      "baseline_acceptance": 0.1738,
+      "projected_acceptance": 0.3938,
+      "acceptance_lift_pp": 22.0,
+      "priority_segments": true
+    },
+    {
+      "user_segment": "power",
+      "meal_time": "late_night",
+      "baseline_aov": 497.61,
+      "projected_aov": 534.04,
+      "aov_lift_pct": 7.32,
+      "baseline_acceptance": 0.1112,
+      "projected_acceptance": 0.3312,
+      "acceptance_lift_pp": 22.0,
+      "priority_segments": true
+    }
+  ],
+  "ab_test_design": {
+    "experiment_design": {
+      "name": "CSAO AI vs Baseline A/B Test",
+      "control": "Rule-based or no CSAO recommendations (50% traffic)",
+      "treatment": "AI-powered CSAO recommendations (50% traffic)",
+      "traffic_split": "50/50",
+      "n_per_group": 49,
+      "duration_days": 7,
+      "alpha": 0.05,
+      "power": 0.8,
+      "mde_pp": 24.5
+    },
+    "primary_metrics": [
+      {
+        "metric": "CSAO Acceptance Rate",
+        "hypothesis": "H1: Treatment > Control",
+        "test": "Two-proportion z-test",
+        "target_lift": "+24.5 percentage points",
+        "guardrail": "Must not decrease below control - 2pp"
+      },
+      {
+        "metric": "Average Order Value (AOV)",
+        "hypothesis": "H1: Treatment_AOV > Control_AOV",
+        "test": "Welch t-test",
+        "target_lift": "+10-15%",
+        "guardrail": "Must remain positive"
+      },
+      {
+        "metric": "Cart-to-Order (C2O) Ratio",
+        "hypothesis": "H1: Treatment does not harm C2O",
+        "test": "Chi-square test on conversion",
+        "target_lift": "No degradation (guardrail only)",
+        "guardrail": "C2O must stay >= baseline - 2pp"
+      }
+    ],
+    "secondary_metrics": [
+      "CSAO Rail Order Share",
+      "CSAO Rail Attach Rate",
+      "Average Items per Order",
+      "Click-Through Rate on CSAO Rail",
+      "Time-to-Order"
+    ],
+    "guardrail_metrics": [
+      {
+        "metric": "Cart Abandonment Rate",
+        "threshold": "Must stay <= baseline + 2pp",
+        "rationale": "CSAO should not disrupt ordering flow"
+      },
+      {
+        "metric": "User Rating / Satisfaction Score",
+        "threshold": "Must stay >= baseline - 0.1 points",
+        "rationale": "Recommendations must not annoy users"
+      },
+      {
+        "metric": "App Session Duration (negative)",
+        "threshold": "Session length should not increase > 20%",
+        "rationale": "Excessive decision fatigue indicates bad UX"
+      },
+      {
+        "metric": "Recommendation Fatigue (CTR degradation over time)",
+        "threshold": "CTR drop < 20% over 7 days",
+        "rationale": "Repeated irrelevant recs cause fatigue"
+      }
+    ],
+    "statistical_tests": {
+      "acceptance_rate": "Two-proportion z-test (one-tailed)",
+      "aov": "Welch t-test (one-tailed)",
+      "revenue": "Bootstrap confidence intervals",
+      "c2o_ratio": "Chi-square test",
+      "correction": "Bonferroni correction for multiple testing"
+    },
+    "rollout_strategy": {
+      "phase_1": "1% traffic (canary) \u2014 2 days \u2014 check for errors",
+      "phase_2": "10% traffic \u2014 3 days \u2014 sanity check metrics",
+      "phase_3": "50/50 A/B \u2014 full experiment duration",
+      "phase_4": "If successful: 100% rollout + monitor"
+    },
+    "power_analysis": {
+      "baseline_acceptance": 0.13,
+      "expected_acceptance": 0.375,
+      "min_detectable_effect_pp": 24.5,
+      "sample_size_per_group": 49,
+      "estimated_duration_days": 7
+    }
+  },
+  "scalability": {
+    "traffic_estimates": {
+      "daily_orders": 3000000,
+      "avg_rps": 34.7,
+      "peak_rps": 104.2,
+      "csao_avg_rps": 62.5,
+      "csao_peak_rps": 187.5
+    },
+    "latency_budget_ms": {
+      "feature_retrieval": 40,
+      "candidate_generation": 30,
+      "ranking_model": 80,
+      "mmr_reranking": 10,
+      "overhead": 18,
+      "total": 178,
+      "p95_target": 250,
+      "p99_target": 300
+    },
+    "infrastructure": {
+      "model_serving": "GBM (ONNX-exported for 3-5x speed), or TF Serving",
+      "feature_store": "Redis Cluster (sub-5ms lookups, 99.9% availability)",
+      "candidate_index": "FAISS (approximate nearest neighbor, <10ms)",
+      "api_layer": "FastAPI on Kubernetes (auto-scaling pods)",
+      "caching": "Redis cache hit rate ~95% for user/item features",
+      "cdn": "Feature pre-warming for predicted peak users"
+    },
+    "auto_scaling": {
+      "min_replicas": 5,
+      "max_replicas": 50,
+      "scale_trigger": "CPU > 70% or latency p95 > 200ms",
+      "scale_up_time": "< 60 seconds"
+    },
+    "benchmarking_strategy": {
+      "step_1": "Unit latency test: single request profiling",
+      "step_2": "Load test with Locust (ramp to 2000 rps)",
+      "step_3": "Soak test: 24h at 500 rps (detect memory leaks)",
+      "step_4": "Chaos test: kill 1 pod, verify auto-recovery",
+      "step_5": "p95/p99 latency must be <250ms/<300ms under 1666 rps peak"
+    }
+  },
+  "recommendation_examples": [
+    {
+      "scenario": "Biryani Sequential Completion",
+      "cart_state": [
+        "Chicken Biryani (Rs.350)"
+      ],
+      "recommendations": [
+        {
+          "item": "Raita",
+          "reason": "Classic complement - 80% co-occurrence",
+          "score": 0.82
+        },
+        {
+          "item": "Salan",
+          "reason": "Traditional biryani side - 65%",
+          "score": 0.74
+        },
+        {
+          "item": "Gulab Jamun",
+          "reason": "Popular dessert pairing - 50%",
+          "score": 0.61
+        },
+        {
+          "item": "Lassi",
+          "reason": "Beverage to complete meal",
+          "score": 0.58
+        }
+      ],
+      "aov_before": 350,
+      "aov_after": 580,
+      "aov_lift_pct": 65.7
+    },
+    {
+      "scenario": "Pizza Meal Completion",
+      "cart_state": [
+        "Margherita Pizza (Rs.320)"
+      ],
+      "recommendations": [
+        {
+          "item": "Garlic Bread",
+          "reason": "Top complement for pizza - 65%",
+          "score": 0.79
+        },
+        {
+          "item": "Soft Drink",
+          "reason": "Beverage missing from cart",
+          "score": 0.71
+        },
+        {
+          "item": "Chicken Wings",
+          "reason": "Popular starter pairing",
+          "score": 0.55
+        }
+      ],
+      "aov_before": 320,
+      "aov_after": 555,
+      "aov_lift_pct": 73.4
+    },
+    {
+      "scenario": "Budget User \u2013 Low-price Add-ons",
+      "cart_state": [
+        "Veg Thali (Rs.150)"
+      ],
+      "recommendations": [
+        {
+          "item": "Buttermilk",
+          "reason": "Budget-friendly beverage (Rs.30)",
+          "score": 0.68
+        },
+        {
+          "item": "Papad",
+          "reason": "Low-price side (Rs.20)",
+          "score": 0.62
+        },
+        {
+          "item": "Gulab Jamun (single)",
+          "reason": "Rs.40 dessert",
+          "score": 0.55
+        }
+      ],
+      "aov_before": 150,
+      "aov_after": 240,
+      "aov_lift_pct": 60.0
+    },
+    {
+      "scenario": "Late Night Cravings",
+      "cart_state": [
+        "Chicken Burger (Rs.220)"
+      ],
+      "meal_time": "late_night",
+      "recommendations": [
+        {
+          "item": "Fries",
+          "reason": "Burger-fries pairing (70%)",
+          "score": 0.77
+        },
+        {
+          "item": "Cold Coffee",
+          "reason": "Late night beverage boost",
+          "score": 0.65
+        },
+        {
+          "item": "Brownie",
+          "reason": "Late-night sweet craving",
+          "score": 0.58
+        }
+      ],
+      "aov_before": 220,
+      "aov_after": 405,
+      "aov_lift_pct": 84.1
+    },
+    {
+      "scenario": "Cold Start User \u2013 Rule-based fallback",
+      "cart_state": [
+        "South Indian Thali (Rs.200)"
+      ],
+      "user_type": "new (0 orders)",
+      "recommendations": [
+        {
+          "item": "Filter Coffee",
+          "reason": "Top restaurant beverage (bestseller)",
+          "score": 0.71
+        },
+        {
+          "item": "Vada",
+          "reason": "Popular starter (80% popularity)",
+          "score": 0.65
+        },
+        {
+          "item": "Payasam",
+          "reason": "Traditional dessert complement",
+          "score": 0.52
+        }
+      ],
+      "aov_before": 200,
+      "aov_after": 330,
+      "aov_lift_pct": 65.0,
+      "strategy": "cold_start_rules + restaurant_popularity"
+    }
+  ],
+  "deployment_strategy": {
+    "phase_1_canary": "1% traffic for 48h \u2014 monitor errors, latency",
+    "phase_2_ab_test": "50/50 split for 7-14 days \u2014 measure primary metrics",
+    "phase_3_full_roll": "100% rollout if A/B success + no guardrail violations",
+    "phase_4_monitor": "Ongoing monitoring: drift detection, retraining schedule",
+    "retraining_freq": "Weekly model refresh with new order data",
+    "data_freshness": "User features: daily | Item features: daily | Model: weekly"
+  },
+  "key_insights": [
+    "50% of all orders are single-item \u2014 largest CSAO opportunity",
+    "60% of orders lack a beverage \u2014 easy, high-acceptance recommendation",
+    "Power users accept 2x more recommendations than new users",
+    "Peak hours (12-2pm, 7-9pm) drive 35% of daily orders \u2014 prioritise latency",
+    "Festival seasons show 40% AOV spike \u2014 pre-load seasonal recommendations",
+    "Cold-start coverage via rules achieves 20-25% acceptance (vs 5-10% random)",
+    "LLM embeddings enable zero-shot recommendation for new menu items"
+  ]
+}

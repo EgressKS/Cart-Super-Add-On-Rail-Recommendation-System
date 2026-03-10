@@ -1,0 +1,373 @@
+{
+  "models": {
+    "popularity_baseline": {
+      "model": "Popularity Baseline",
+      "auc_roc": 0.5366,
+      "avg_precision": 0.0637,
+      "precision@5": 0.2,
+      "precision@10": 0.1,
+      "recall@10": 0.0003,
+      "ndcg@10": 0.0851,
+      "mrr": 0.2
+    },
+    "rule_based_baseline": {
+      "model": "Rule-Based Baseline",
+      "auc_roc": 0.6119,
+      "avg_precision": 0.0974,
+      "precision@5": 0.0,
+      "precision@10": 0.1,
+      "recall@10": 0.0003,
+      "ndcg@10": 0.0636,
+      "mrr": 0.1
+    },
+    "logistic_regression": {
+      "model": "Logistic Regression",
+      "auc_roc": 0.7554,
+      "avg_precision": 0.2016,
+      "precision@5": 0.8,
+      "precision@10": 0.7,
+      "recall@10": 0.0021,
+      "ndcg@10": 0.7656,
+      "mrr": 1.0
+    },
+    "gbm_ranking_model": {
+      "model": "GBM Ranking Model",
+      "auc_roc": 0.768,
+      "avg_precision": 0.2182,
+      "precision@5": 0.2,
+      "precision@10": 0.5,
+      "recall@10": 0.0015,
+      "ndcg@10": 0.5075,
+      "mrr": 1.0
+    },
+    "two_tower_neural": {
+      "model": "Two-Tower Neural Net",
+      "auc_roc": 0.7568,
+      "avg_precision": 0.1971,
+      "precision@5": 0.6,
+      "precision@10": 0.6,
+      "recall@10": 0.0018,
+      "ndcg@10": 0.6621,
+      "mrr": 1.0
+    }
+  },
+  "segment_wise": {
+    "user_segment": {
+      "1": {
+        "model": "user_segment=1",
+        "auc_roc": 0.7116,
+        "avg_precision": 0.0823,
+        "precision@5": 0.2,
+        "precision@10": 0.4,
+        "recall@10": 0.0077,
+        "ndcg@10": 0.4315,
+        "mrr": 1.0
+      },
+      "2": {
+        "model": "user_segment=2",
+        "auc_roc": 0.7268,
+        "avg_precision": 0.1728,
+        "precision@5": 0.2,
+        "precision@10": 0.4,
+        "recall@10": 0.003,
+        "ndcg@10": 0.3012,
+        "mrr": 0.25
+      },
+      "3": {
+        "model": "user_segment=3",
+        "auc_roc": 0.7436,
+        "avg_precision": 0.2813,
+        "precision@5": 0.4,
+        "precision@10": 0.6,
+        "recall@10": 0.0067,
+        "ndcg@10": 0.5211,
+        "mrr": 0.5
+      },
+      "4": {
+        "model": "user_segment=4",
+        "auc_roc": 0.742,
+        "avg_precision": 0.3568,
+        "precision@5": 0.4,
+        "precision@10": 0.4,
+        "recall@10": 0.0084,
+        "ndcg@10": 0.457,
+        "mrr": 1.0
+      },
+      "0": {
+        "model": "user_segment=0",
+        "auc_roc": 0.6852,
+        "avg_precision": 0.0439,
+        "precision@5": 0.0,
+        "precision@10": 0.1,
+        "recall@10": 0.0093,
+        "ndcg@10": 0.0694,
+        "mrr": 0.125
+      }
+    },
+    "meal_time": {
+      "2": {
+        "model": "meal_time=2",
+        "auc_roc": 0.7717,
+        "avg_precision": 0.1822,
+        "precision@5": 0.2,
+        "precision@10": 0.4,
+        "recall@10": 0.0113,
+        "ndcg@10": 0.3005,
+        "mrr": 0.2
+      },
+      "1": {
+        "model": "meal_time=1",
+        "auc_roc": 0.7705,
+        "avg_precision": 0.227,
+        "precision@5": 0.4,
+        "precision@10": 0.4,
+        "recall@10": 0.0036,
+        "ndcg@10": 0.478,
+        "mrr": 1.0
+      },
+      "3": {
+        "model": "meal_time=3",
+        "auc_roc": 0.7684,
+        "avg_precision": 0.2225,
+        "precision@5": 0.2,
+        "precision@10": 0.6,
+        "recall@10": 0.0049,
+        "ndcg@10": 0.4362,
+        "mrr": 0.2
+      },
+      "0": {
+        "model": "meal_time=0",
+        "auc_roc": 0.7653,
+        "avg_precision": 0.231,
+        "precision@5": 0.8,
+        "precision@10": 0.8,
+        "recall@10": 0.016,
+        "ndcg@10": 0.7949,
+        "mrr": 1.0
+      },
+      "4": {
+        "model": "meal_time=4",
+        "auc_roc": 0.7467,
+        "avg_precision": 0.1988,
+        "precision@5": 0.6,
+        "precision@10": 0.5,
+        "recall@10": 0.037,
+        "ndcg@10": 0.5894,
+        "mrr": 1.0
+      }
+    },
+    "restaurant_type": {
+      "1": {
+        "model": "restaurant_type=1",
+        "auc_roc": 0.7799,
+        "avg_precision": 0.2521,
+        "precision@5": 0.6,
+        "precision@10": 0.5,
+        "recall@10": 0.0098,
+        "ndcg@10": 0.4883,
+        "mrr": 0.5
+      },
+      "2": {
+        "model": "restaurant_type=2",
+        "auc_roc": 0.7622,
+        "avg_precision": 0.1936,
+        "precision@5": 0.4,
+        "precision@10": 0.4,
+        "recall@10": 0.0031,
+        "ndcg@10": 0.3469,
+        "mrr": 0.3333
+      },
+      "4": {
+        "model": "restaurant_type=4",
+        "auc_roc": 0.7407,
+        "avg_precision": 0.2369,
+        "precision@5": 0.6,
+        "precision@10": 0.6,
+        "recall@10": 0.019,
+        "ndcg@10": 0.6653,
+        "mrr": 1.0
+      },
+      "3": {
+        "model": "restaurant_type=3",
+        "auc_roc": 0.7702,
+        "avg_precision": 0.261,
+        "precision@5": 0.4,
+        "precision@10": 0.6,
+        "recall@10": 0.0112,
+        "ndcg@10": 0.6078,
+        "mrr": 1.0
+      },
+      "0": {
+        "model": "restaurant_type=0",
+        "auc_roc": 0.7644,
+        "avg_precision": 0.2055,
+        "precision@5": 0.4,
+        "precision@10": 0.5,
+        "recall@10": 0.0072,
+        "ndcg@10": 0.4081,
+        "mrr": 0.3333
+      }
+    },
+    "cold_start_user": {
+      "0": {
+        "model": "cold_start_user=0",
+        "auc_roc": 0.7616,
+        "avg_precision": 0.2231,
+        "precision@5": 0.2,
+        "precision@10": 0.5,
+        "recall@10": 0.0015,
+        "ndcg@10": 0.5075,
+        "mrr": 1.0
+      },
+      "1": {
+        "model": "cold_start_user=1",
+        "auc_roc": 0.6852,
+        "avg_precision": 0.0439,
+        "precision@5": 0.0,
+        "precision@10": 0.1,
+        "recall@10": 0.0093,
+        "ndcg@10": 0.0694,
+        "mrr": 0.125
+      }
+    },
+    "budget_tier": {
+      "1": {
+        "model": "budget_tier=1",
+        "auc_roc": 0.7661,
+        "avg_precision": 0.2094,
+        "precision@5": 0.2,
+        "precision@10": 0.4,
+        "recall@10": 0.0024,
+        "ndcg@10": 0.3089,
+        "mrr": 0.25
+      },
+      "0": {
+        "model": "budget_tier=0",
+        "auc_roc": 0.7642,
+        "avg_precision": 0.2185,
+        "precision@5": 0.8,
+        "precision@10": 0.6,
+        "recall@10": 0.0061,
+        "ndcg@10": 0.6458,
+        "mrr": 1.0
+      },
+      "2": {
+        "model": "budget_tier=2",
+        "auc_roc": 0.7776,
+        "avg_precision": 0.2465,
+        "precision@5": 0.4,
+        "precision@10": 0.6,
+        "recall@10": 0.0086,
+        "ndcg@10": 0.5115,
+        "mrr": 0.5
+      }
+    }
+  },
+  "cold_start": {
+    "cold_start_users": {
+      "model": "Cold Start Users",
+      "auc_roc": 0.6852,
+      "avg_precision": 0.0439,
+      "precision@5": 0.0,
+      "precision@10": 0.1,
+      "recall@10": 0.0093,
+      "ndcg@10": 0.0694,
+      "mrr": 0.125
+    },
+    "new_restaurants": {
+      "model": "New Restaurants",
+      "auc_roc": 0.7564,
+      "avg_precision": 0.1974,
+      "precision@5": 0.6,
+      "precision@10": 0.6,
+      "recall@10": 0.009,
+      "ndcg@10": 0.6831,
+      "mrr": 1.0
+    },
+    "new_items": {
+      "model": "New Items",
+      "auc_roc": 0.7702,
+      "avg_precision": 0.2033,
+      "precision@5": 0.4,
+      "precision@10": 0.4,
+      "recall@10": 0.0088,
+      "ndcg@10": 0.4569,
+      "mrr": 1.0
+    }
+  },
+  "error_analysis": {
+    "total_positives": 3340,
+    "total_negatives": 55588,
+    "true_positives": 113,
+    "false_positives": 112,
+    "false_negatives": 3227,
+    "fp_avg_price": 4.764536334901502,
+    "fn_avg_complementarity": 0.3785246895718514,
+    "fp_category_dist": {
+      "0": 27,
+      "1": 25,
+      "2": 18,
+      "4": 17,
+      "5": 15,
+      "6": 5,
+      "3": 5
+    },
+    "fp_meal_time_dist": {
+      "3": 47,
+      "1": 33,
+      "0": 16,
+      "2": 11,
+      "4": 5
+    },
+    "fp_cold_start_rate": 0.0,
+    "fn_high_comp_missed": 1090
+  },
+  "feature_importance_top10": [
+    {
+      "feature": "avg_complementarity",
+      "importance": 0.3488761503863129
+    },
+    {
+      "feature": "position_bias",
+      "importance": 0.23056907671028257
+    },
+    {
+      "feature": "user_log_orders",
+      "importance": 0.18700513860305482
+    },
+    {
+      "feature": "segment_enc",
+      "importance": 0.07049548656141362
+    },
+    {
+      "feature": "pop_score",
+      "importance": 0.027640601666667104
+    },
+    {
+      "feature": "addon_ratio",
+      "importance": 0.014724665431385297
+    },
+    {
+      "feature": "log_price",
+      "importance": 0.010466661553647236
+    },
+    {
+      "feature": "starter_order_rate",
+      "importance": 0.009242133689038135
+    },
+    {
+      "feature": "beverage_order_rate",
+      "importance": 0.008867863374178265
+    },
+    {
+      "feature": "cart_value_log",
+      "importance": 0.008845875208035649
+    }
+  ],
+  "baseline_comparison": {
+    "auc_lift_vs_rule_based": 0.1561,
+    "ndcg_lift_vs_rule_based": 0.4439,
+    "auc_lift_vs_popularity": 0.2314,
+    "neural_auc_lift_vs_rule": 0.1449
+  }
+}
